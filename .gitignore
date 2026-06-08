@@ -13,3 +13,6 @@ logs/
 mobile/corretivas_app/.dart_tool/
 mobile/corretivas_app/.flutter-plugins-dependencies
 mobile/corretivas_app/build/
+mobile/corretivas_app/android/.gradle/
+mobile/corretivas_app/android/.kotlin/
+mobile/corretivas_app/android/local.properties
