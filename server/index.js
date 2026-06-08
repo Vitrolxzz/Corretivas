@@ -14,7 +14,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 const distDir = path.join(rootDir, 'dist');
-const uploadDir = path.join(rootDir, 'data', 'uploads');
+const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(rootDir, 'data');
+const uploadDir = path.join(dataDir, 'uploads');
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -30,6 +31,15 @@ mkdirSync(uploadDir, { recursive: true });
 
 app.use(express.json({ limit: '25mb' }));
 app.use('/api/uploads', express.static(uploadDir));
+
+function basicHealthPayload() {
+  return {
+    ok: true,
+    service: 'corretivas',
+    backend: process.env.DATA_BACKEND || 'sqlite',
+    uptime: Math.round(process.uptime()),
+  };
+}
 
 function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -710,9 +720,17 @@ app.get(
   asyncRoute(async (_req, res) => {
     const db = await query(`SELECT datetime('now') AS now`);
     const active = await getActivePeriod();
-    res.json({ ok: true, databaseTime: db.rows[0].now, activePeriod: active && periodToJson(active) });
+    res.json({
+      ...basicHealthPayload(),
+      databaseTime: db.rows[0].now,
+      activePeriod: active && periodToJson(active),
+    });
   }),
 );
+
+app.get('/health', (_req, res) => {
+  res.json(basicHealthPayload());
+});
 
 app.get('/api/events', (req, res) => {
   res.writeHead(200, {
@@ -2871,6 +2889,14 @@ if (existsSync(distDir)) {
   app.use(express.static(distDir));
   app.get(/.*/, (_req, res) => {
     res.sendFile(path.join(distDir, 'index.html'));
+  });
+} else {
+  app.get('/', (_req, res) => {
+    res.json({
+      ...basicHealthPayload(),
+      webBuild: false,
+      message: 'API ativa. Execute npm run build para gerar o sistema web.',
+    });
   });
 }
 
