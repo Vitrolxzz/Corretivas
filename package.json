@@ -1,0 +1,50 @@
+{
+  "name": "sistema-suporte",
+  "version": "1.0.0",
+  "description": "Sistema de anotacao de ocorrencias Corretivas para suporte remoto.",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently -k -n API,WEB -c cyan,magenta \"node server/index.js\" \"vite --host 0.0.0.0\"",
+    "dev:api": "node server/index.js",
+    "dev:web": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "db:migrate": "node server/migrate.js",
+    "firebase:backup": "node scripts/firebase/backup.js",
+    "firebase:migrate:dry": "node scripts/firebase/migrate.js",
+    "firebase:migrate": "node scripts/firebase/migrate.js --apply",
+    "firebase:validate": "node scripts/firebase/validate.js",
+    "firebase:validate:remote": "node scripts/firebase/validate.js --firebase",
+    "firebase:restore": "node scripts/firebase/restore.js",
+    "import:excel": "node scripts/importExcel.js",
+    "lint": "node --check server/db.js && node --check server/migrate.js && node --check server/index.js && node --check server/logger.js && node --check server/firebase.js && node --check server/v1/security.js && node --check server/v1/repository.js && node --check server/v1/router.js && node --check scripts/importExcel.js && node --check scripts/firebase/common.js && node --check scripts/firebase/backup.js && node --check scripts/firebase/migrate.js && node --check scripts/firebase/restore.js && node --check scripts/firebase/validate.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/react": "^6.1.20",
+    "@fullcalendar/timegrid": "^6.1.20",
+    "@vitejs/plugin-react": "^6.0.2",
+    "bcryptjs": "^3.0.3",
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "firebase-admin": "^13.10.0",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^1.16.0",
+    "pino": "^10.3.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "read-excel-file": "^9.0.10",
+    "sharp": "^0.34.5",
+    "vite": "^8.0.14",
+    "zod": "^4.4.3"
+  }
+}

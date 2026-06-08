@@ -1,0 +1,15 @@
+node_modules/
+dist/
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/uploads/
+backups/
+firebase-service-account*.json
+.env
+npm-debug.log*
+*.local
+logs/
+mobile/corretivas_app/.dart_tool/
+mobile/corretivas_app/.flutter-plugins-dependencies
+mobile/corretivas_app/build/
