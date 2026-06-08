@@ -29,7 +29,7 @@ class CorretivasMobile extends StatelessWidget {
 
 class AppConfig {
   static const apiBaseUrl = String.fromEnvironment('API_BASE_URL',
-      defaultValue: 'http://192.168.15.8:3001');
+      defaultValue: 'https://corretivas.up.railway.app');
 }
 
 class OperatorAccessPage extends StatefulWidget {
@@ -193,7 +193,7 @@ class _HomePageState extends State<HomePage> {
         setState(() => _refreshKey++);
       }
     }, onError: (_) {});
-    _queue.flush(widget.api);
+    _queue.flush(widget.api).catchError((_) => 0);
   }
 
   @override
@@ -278,10 +278,17 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             tooltip: 'Sincronizar pendencias',
             onPressed: () async {
-              final count = await _queue.flush(widget.api);
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$count operacoes sincronizadas.')));
+              try {
+                final count = await _queue.flush(widget.api);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('$count operacoes sincronizadas.')));
+              } catch (error) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(
+                        'Nao foi possivel sincronizar: ${apiErrorMessage(error)}')));
+              }
             },
             icon: const Icon(Icons.sync_rounded),
           ),
@@ -969,7 +976,14 @@ class _ResourcePageState extends State<ResourcePage> {
     try {
       await widget.api.delete('/${widget.resource}/${record['id']}');
       _load();
-    } catch (_) {
+    } catch (error) {
+      if (!isOfflineError(error)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Erro ao excluir: ${apiErrorMessage(error)}')));
+        return;
+      }
+
       await _queue.enqueue(
         'DELETE',
         '/${widget.resource}/${record['id']}',
@@ -978,7 +992,7 @@ class _ResourcePageState extends State<ResourcePage> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Sem internet. Exclusao entrou na fila.')));
+          content: Text('Sem conexao com a API. Exclusao entrou na fila.')));
     }
   }
 
@@ -1105,7 +1119,8 @@ class _ResourceEditorState extends State<ResourceEditor> {
 
   Future<void> _save() async {
     final body = {
-      for (final entry in _controllers.entries) entry.key: entry.value.text
+      for (final entry in _controllers.entries)
+        entry.key: editorValue(widget.resource, entry.key, entry.value.text)
     };
 
     try {
@@ -1118,7 +1133,14 @@ class _ResourceEditorState extends State<ResourceEditor> {
 
       if (!mounted) return;
       Navigator.pop(context, true);
-    } catch (_) {
+    } catch (error) {
+      if (!isOfflineError(error)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Erro ao salvar: ${apiErrorMessage(error)}')));
+        return;
+      }
+
       await _queue.enqueue(
         widget.record == null ? 'POST' : 'PUT',
         widget.record == null
@@ -1130,7 +1152,7 @@ class _ResourceEditorState extends State<ResourceEditor> {
       if (!mounted) return;
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Sem internet. Operacao entrou na fila.')));
+          content: Text('Sem conexao com a API. Operacao entrou na fila.')));
     }
   }
 
@@ -1279,7 +1301,14 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
 
     try {
       await widget.api.delete(_recordPath);
-    } catch (_) {
+    } catch (error) {
+      if (!isOfflineError(error)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Erro ao excluir: ${apiErrorMessage(error)}')));
+        return;
+      }
+
       await _queue.enqueue(
         'DELETE',
         _recordPath,
@@ -1289,7 +1318,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Sem internet. Exclusao entrou na fila.')));
+          content: Text('Sem conexao com a API. Exclusao entrou na fila.')));
     }
 
     if (!mounted) return;
@@ -1611,6 +1640,33 @@ String defaultValue(String resource, String key) {
   if (resource == 'agendamentos' && key == 'status') return 'agendada';
   if (resource == 'catracas' && key == 'status') return 'Aguardando montagem';
   return '';
+}
+
+dynamic editorValue(String resource, String key, String value) {
+  final text = value.trim();
+  final numericFields = {'difficulty', 'visitValue', 'partsValue'};
+  final nullableFields = {
+    'occurrenceDate',
+    'solutionDate',
+    'visitDate',
+    'visitTime',
+    'expectedDeliveryDate',
+  };
+
+  if (numericFields.contains(key)) {
+    if (text.isEmpty) return key == 'difficulty' ? null : 0;
+    return num.tryParse(text.replaceAll(',', '.')) ?? text;
+  }
+
+  if (nullableFields.contains(key) && text.isEmpty) {
+    return null;
+  }
+
+  if (key == 'status' && text.isEmpty) {
+    return defaultValue(resource, key);
+  }
+
+  return text;
 }
 
 String fieldLabel(String key) {

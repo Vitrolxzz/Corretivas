@@ -89,6 +89,20 @@ class ApiClient {
   }
 }
 
+bool isOfflineError(Object error) {
+  return error is SocketException ||
+      error is TimeoutException ||
+      error is http.ClientException;
+}
+
+String apiErrorMessage(Object error) {
+  if (error is ApiException) {
+    return error.message;
+  }
+
+  return error.toString();
+}
+
 class OfflineQueue {
   static const _key = 'offline_queue';
 
@@ -133,9 +147,11 @@ class OfflineQueue {
         }
 
         synced += 1;
-      } on SocketException {
-        remaining.add(item);
-      } on TimeoutException {
+      } catch (error) {
+        if (!isOfflineError(error)) {
+          rethrow;
+        }
+
         remaining.add(item);
       }
     }

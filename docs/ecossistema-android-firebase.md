@@ -267,7 +267,7 @@ Instalar Flutter e Android SDK, depois:
 ```powershell
 cd mobile\corretivas_app
 flutter pub get
-flutter build apk --debug --dart-define=API_BASE_URL=http://192.168.15.8:3001
+flutter build apk --debug --dart-define=API_BASE_URL=https://corretivas.up.railway.app
 ```
 
 APK esperado:
@@ -291,7 +291,7 @@ http://IP-DO-SERVIDOR:3001
 O build atual usa como padrao:
 
 ```text
-http://192.168.15.8:3001
+https://corretivas.up.railway.app
 ```
 
 Para uma URL publica, gere novo APK com:

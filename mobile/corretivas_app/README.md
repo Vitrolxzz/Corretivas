@@ -8,7 +8,7 @@ Instale Flutter e Android SDK.
 
 ```powershell
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://192.168.15.8:3001
+flutter run --dart-define=API_BASE_URL=https://corretivas.up.railway.app
 ```
 
 ## Gerar APK de teste
@@ -28,7 +28,7 @@ Esse nome e enviado para a API em todas as operacoes e fica registrado na audito
 O APK atual usa como URL padrao:
 
 ```text
-http://192.168.15.8:3001
+https://corretivas.up.railway.app
 ```
 
 O aplicativo funciona em qualquer lugar desde que consiga acessar a URL da API configurada.
