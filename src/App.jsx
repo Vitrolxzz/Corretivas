@@ -111,8 +111,24 @@ function formatDate(value) {
     return '-';
   }
 
-  const [year, month, day] = value.slice(0, 10).split('-');
-  return `${day}/${month}/${year}`;
+  const text = String(value).trim();
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (isoMatch) {
+    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  }
+
+  const brMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (brMatch) {
+    return `${brMatch[1].padStart(2, '0')}/${brMatch[2].padStart(2, '0')}/${brMatch[3]}`;
+  }
+
+  const brShortMatch = text.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (brShortMatch) {
+    return `${brShortMatch[1].padStart(2, '0')}/${brShortMatch[2].padStart(2, '0')}/${new Date().getFullYear()}`;
+  }
+
+  return text;
 }
 
 function formatMoney(value) {

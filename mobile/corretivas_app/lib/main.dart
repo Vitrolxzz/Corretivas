@@ -1179,13 +1179,23 @@ class _ResourceEditorState extends State<ResourceEditor> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: TextField(
                     controller: entry.value,
+                    keyboardType: dateFieldKeys.contains(entry.key)
+                        ? TextInputType.datetime
+                        : numberFieldKeys.contains(entry.key)
+                            ? const TextInputType.numberWithOptions(
+                                decimal: true)
+                            : TextInputType.text,
                     minLines: entry.key.toLowerCase().contains('notes') ||
                             entry.key.toLowerCase().contains('problem')
                         ? 2
                         : 1,
                     maxLines: 4,
-                    decoration:
-                        InputDecoration(labelText: fieldLabel(entry.key)),
+                    decoration: InputDecoration(
+                      labelText: fieldLabel(entry.key),
+                      hintText: dateFieldKeys.contains(entry.key)
+                          ? 'dd/mm/aaaa ou dd/mm'
+                          : null,
+                    ),
                   ),
                 )),
             FilledButton.icon(
@@ -1642,18 +1652,20 @@ String defaultValue(String resource, String key) {
   return '';
 }
 
+const dateFieldKeys = {
+  'occurrenceDate',
+  'solutionDate',
+  'visitDate',
+  'expectedDeliveryDate',
+};
+
+const numberFieldKeys = {'difficulty', 'visitValue', 'partsValue'};
+
 dynamic editorValue(String resource, String key, String value) {
   final text = value.trim();
-  final numericFields = {'difficulty', 'visitValue', 'partsValue'};
-  final nullableFields = {
-    'occurrenceDate',
-    'solutionDate',
-    'visitDate',
-    'visitTime',
-    'expectedDeliveryDate',
-  };
+  final nullableFields = {...dateFieldKeys, 'visitTime'};
 
-  if (numericFields.contains(key)) {
+  if (numberFieldKeys.contains(key)) {
     if (text.isEmpty) return key == 'difficulty' ? null : 0;
     return num.tryParse(text.replaceAll(',', '.')) ?? text;
   }
@@ -1662,8 +1674,32 @@ dynamic editorValue(String resource, String key, String value) {
     return null;
   }
 
+  if (dateFieldKeys.contains(key)) {
+    return normalizeDateInput(text);
+  }
+
   if (key == 'status' && text.isEmpty) {
     return defaultValue(resource, key);
+  }
+
+  return text;
+}
+
+String normalizeDateInput(String value) {
+  final text = value.trim();
+  final isoMatch = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(text);
+  if (isoMatch != null) {
+    return '${isoMatch.group(1)}-${isoMatch.group(2)}-${isoMatch.group(3)}';
+  }
+
+  final brMatch = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(text);
+  if (brMatch != null) {
+    return '${brMatch.group(3)}-${brMatch.group(2)!.padLeft(2, '0')}-${brMatch.group(1)!.padLeft(2, '0')}';
+  }
+
+  final brShortMatch = RegExp(r'^(\d{1,2})/(\d{1,2})$').firstMatch(text);
+  if (brShortMatch != null) {
+    return '${DateTime.now().year}-${brShortMatch.group(2)!.padLeft(2, '0')}-${brShortMatch.group(1)!.padLeft(2, '0')}';
   }
 
   return text;

@@ -26,6 +26,7 @@ const resources = {
   ocorrencias: {
     table: 'corrective_occurrences',
     collection: 'ocorrencias',
+    dateFields: ['occurrenceDate', 'solutionDate'],
     fields: {
       periodId: 'period_id',
       occurrenceDate: 'occurrence_date',
@@ -45,6 +46,7 @@ const resources = {
   agendamentos: {
     table: 'appointments',
     collection: 'agendamentos',
+    dateFields: ['visitDate'],
     fields: {
       clientName: 'client_name',
       address: 'address',
@@ -73,6 +75,7 @@ const resources = {
   catracas: {
     table: 'turnstiles',
     collection: 'catracas',
+    dateFields: ['expectedDeliveryDate'],
     fields: {
       clientName: 'client_name',
       model: 'model',
@@ -130,6 +133,44 @@ function backend() {
   return process.env.DATA_BACKEND === 'firebase' && firestore() ? 'firebase' : 'sqlite';
 }
 
+function normalizeDate(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const text = String(value).trim();
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const brMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (brMatch) {
+    return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
+  }
+
+  const brShortMatch = text.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (brShortMatch) {
+    return `${new Date().getFullYear()}-${brShortMatch[2].padStart(2, '0')}-${brShortMatch[1].padStart(2, '0')}`;
+  }
+
+  const error = new Error('Data invalida. Use o formato AAAA-MM-DD, DD/MM/AAAA ou DD/MM.');
+  error.status = 400;
+  throw error;
+}
+
+function normalizePayload(body, config) {
+  const normalized = { ...body };
+
+  for (const field of config.dateFields || []) {
+    if (Object.prototype.hasOwnProperty.call(normalized, field)) {
+      normalized[field] = normalizeDate(normalized[field]);
+    }
+  }
+
+  return normalized;
+}
+
 function toApi(row, config) {
   const inverted = Object.fromEntries(Object.entries(config.fields).map(([apiKey, dbKey]) => [dbKey, apiKey]));
   const record = {};
@@ -147,10 +188,11 @@ function toApi(row, config) {
 
 function toDb(body, config) {
   const mapped = {};
+  const normalized = normalizePayload(body, config);
 
   for (const [apiKey, dbKey] of Object.entries(config.fields)) {
-    if (Object.prototype.hasOwnProperty.call(body, apiKey)) {
-      mapped[dbKey] = body[apiKey];
+    if (Object.prototype.hasOwnProperty.call(normalized, apiKey)) {
+      mapped[dbKey] = normalized[apiKey];
     }
   }
 
@@ -212,14 +254,15 @@ export async function getRecord(resource, id) {
 
 export async function createRecord(resource, body) {
   const config = resourceConfig(resource);
+  const normalizedBody = normalizePayload(body, config);
 
   if (backend() === 'firebase') {
-    const payload = { ...body, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
+    const payload = { ...normalizedBody, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
     const doc = await firestore().collection(config.collection).add(payload);
     return { id: doc.id, ...payload };
   }
 
-  const mapped = toDb(body, config);
+  const mapped = toDb(normalizedBody, config);
 
   if ((resource === 'ocorrencias' || resource === 'comandas') && !mapped.period_id) {
     const active = await query(`SELECT id FROM periods WHERE status = 'active' ORDER BY year DESC LIMIT 1`);
@@ -240,15 +283,16 @@ export async function createRecord(resource, body) {
 
 export async function updateRecord(resource, id, body) {
   const config = resourceConfig(resource);
+  const normalizedBody = normalizePayload(body, config);
 
   if (backend() === 'firebase') {
     const ref = firestore().collection(config.collection).doc(String(id));
-    await ref.set({ ...body, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    await ref.set({ ...normalizedBody, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     const updated = await ref.get();
     return { id: updated.id, ...updated.data() };
   }
 
-  const mapped = toDb(body, config);
+  const mapped = toDb(normalizedBody, config);
   const columns = Object.keys(mapped);
 
   if (!columns.length) {

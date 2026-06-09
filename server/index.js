@@ -60,6 +60,21 @@ function cleanDate(value) {
     return null;
   }
 
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const brMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (brMatch) {
+    return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
+  }
+
+  const brShortMatch = text.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (brShortMatch) {
+    return `${new Date().getFullYear()}-${brShortMatch[2].padStart(2, '0')}-${brShortMatch[1].padStart(2, '0')}`;
+  }
+
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
     const error = new Error('Data invalida. Use o formato AAAA-MM-DD.');
     error.status = 400;
@@ -194,7 +209,18 @@ function dateToJson(value) {
     return value.toISOString().slice(0, 10);
   }
 
-  return String(value).slice(0, 10);
+  const text = String(value).trim();
+  const brMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (brMatch) {
+    return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
+  }
+
+  const brShortMatch = text.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (brShortMatch) {
+    return `${new Date().getFullYear()}-${brShortMatch[2].padStart(2, '0')}-${brShortMatch[1].padStart(2, '0')}`;
+  }
+
+  return text.slice(0, 10);
 }
 
 function todayText() {

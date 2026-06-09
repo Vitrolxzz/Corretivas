@@ -47,7 +47,18 @@ function dateToJson(value) {
     return null;
   }
 
-  return String(value).slice(0, 10);
+  const text = String(value).trim();
+  const brMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (brMatch) {
+    return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
+  }
+
+  const brShortMatch = text.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (brShortMatch) {
+    return `${new Date().getFullYear()}-${brShortMatch[2].padStart(2, '0')}-${brShortMatch[1].padStart(2, '0')}`;
+  }
+
+  return text.slice(0, 10);
 }
 
 function periodToJson(row) {
