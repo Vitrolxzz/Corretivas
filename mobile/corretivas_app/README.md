@@ -14,7 +14,7 @@ flutter run --dart-define=API_BASE_URL=https://corretivas.up.railway.app
 ## Gerar APK de teste
 
 ```powershell
-flutter build apk --debug --dart-define=API_BASE_URL=http://IP-DO-SERVIDOR:3001
+flutter build apk --debug --dart-define=API_BASE_URL=https://corretivas.up.railway.app
 ```
 
 ## Acesso
@@ -49,6 +49,8 @@ As listas de agendamentos, ocorrencias, comandas, catracas, clientes e tecnicos 
 Ao tocar em um item, o app abre a tela de detalhes com todos os campos do registro e acoes de editar, excluir, atualizar e enviar foto quando aplicavel.
 
 O dashboard mobile consome `/api/v1/dashboard` e exibe os mesmos indicadores principais do dashboard web.
+
+Em agendamentos, o campo `Observacoes` permite registrar pecas pendentes, orientacoes para a proxima visita e outros detalhes operacionais.
 
 ## Observacoes
 

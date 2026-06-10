@@ -341,6 +341,7 @@ function appointmentToJson(row) {
     clientName: row.client_name,
     address: row.address,
     reportedProblem: row.reported_problem,
+    notes: row.notes,
     visitDate: dateToJson(row.visit_date),
     visitTime: row.visit_time,
     technician: row.technician,
@@ -451,6 +452,7 @@ function appointmentPayload(body) {
     clientName: cleanText(body.clientName),
     address: cleanText(body.address),
     reportedProblem: cleanText(body.reportedProblem),
+    notes: cleanText(body.notes),
     visitDate: cleanDate(body.visitDate),
     visitTime: cleanTime(body.visitTime),
     technician: cleanText(body.technician),
@@ -1040,6 +1042,7 @@ app.get(
         client_name LIKE $${params.length} COLLATE NOCASE
         OR address LIKE $${params.length} COLLATE NOCASE
         OR reported_problem LIKE $${params.length} COLLATE NOCASE
+        OR notes LIKE $${params.length} COLLATE NOCASE
         OR technician LIKE $${params.length} COLLATE NOCASE
       )`);
     }
@@ -1114,15 +1117,16 @@ app.post(
     const payload = appointmentPayload(req.body);
     const inserted = await query(
       `INSERT INTO appointments (
-        client_name, address, reported_problem, visit_date, visit_time,
+        client_name, address, reported_problem, notes, visit_date, visit_time,
         technician, visit_value, parts_value, status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
       [
         payload.clientName,
         payload.address,
         payload.reportedProblem,
+        payload.notes,
         payload.visitDate,
         payload.visitTime,
         payload.technician,
@@ -1146,12 +1150,13 @@ app.put(
        SET client_name = $2,
            address = $3,
            reported_problem = $4,
-           visit_date = $5,
-           visit_time = $6,
-           technician = $7,
-           visit_value = $8,
-           parts_value = $9,
-           status = $10
+           notes = $5,
+           visit_date = $6,
+           visit_time = $7,
+           technician = $8,
+           visit_value = $9,
+           parts_value = $10,
+           status = $11
        WHERE id = $1
        RETURNING *`,
       [
@@ -1159,6 +1164,7 @@ app.put(
         payload.clientName,
         payload.address,
         payload.reportedProblem,
+        payload.notes,
         payload.visitDate,
         payload.visitTime,
         payload.technician,
@@ -2000,11 +2006,12 @@ app.get(
         [like],
       ),
       query(
-        `SELECT id, client_name, technician, visit_date, reported_problem
+        `SELECT id, client_name, technician, visit_date, reported_problem, notes
          FROM appointments
          WHERE client_name LIKE $1 COLLATE NOCASE
             OR technician LIKE $1 COLLATE NOCASE
             OR reported_problem LIKE $1 COLLATE NOCASE
+            OR notes LIKE $1 COLLATE NOCASE
          ORDER BY COALESCE(visit_date, '9999-12-31') ASC, id DESC
          LIMIT 8`,
         [like],
@@ -2055,7 +2062,10 @@ app.get(
         items: appointments.rows.map((row) => ({
           id: Number(row.id),
           label: row.client_name || `Agendamento #${row.id}`,
-          description: `${dateToJson(row.visit_date) || '-'} - ${row.technician || 'Sem tecnico'} - ${row.reported_problem || ''}`,
+          description: `${dateToJson(row.visit_date) || '-'} - ${row.technician || 'Sem tecnico'} - ${[
+            row.reported_problem,
+            row.notes,
+          ].filter(Boolean).join(' | ')}`,
         })),
       },
       {
@@ -2649,6 +2659,7 @@ app.get(
           client_name LIKE $${params.length} COLLATE NOCASE
           OR address LIKE $${params.length} COLLATE NOCASE
           OR reported_problem LIKE $${params.length} COLLATE NOCASE
+          OR notes LIKE $${params.length} COLLATE NOCASE
           OR technician LIKE $${params.length} COLLATE NOCASE
         )`);
       }
@@ -2680,6 +2691,7 @@ app.get(
         ['Cliente', 'client_name'],
         ['Endereco', 'address'],
         ['Problema', 'reported_problem'],
+        ['Observacoes', 'notes'],
         ['Data', 'visit_date'],
         ['Horario', 'visit_time'],
         ['Tecnico', 'technician'],

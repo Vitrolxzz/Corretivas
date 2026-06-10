@@ -122,6 +122,8 @@ GET  /notificacoes
 POST /notificacoes/push
 ```
 
+Os agendamentos aceitam o campo `notes` para observacoes operacionais, como pecas a levar, pendencias ou orientacoes para a proxima visita.
+
 ## Autenticacao e permissoes
 
 Perfis previstos:

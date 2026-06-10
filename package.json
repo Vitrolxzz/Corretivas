@@ -16,8 +16,10 @@
     "firebase:validate": "node scripts/firebase/validate.js",
     "firebase:validate:remote": "node scripts/firebase/validate.js --firebase",
     "firebase:restore": "node scripts/firebase/restore.js",
+    "remote:migrate:dry": "node scripts/migrateRemoteApi.js",
+    "remote:migrate": "node scripts/migrateRemoteApi.js --apply",
     "import:excel": "node scripts/importExcel.js",
-    "lint": "node --check server/db.js && node --check server/migrate.js && node --check server/index.js && node --check server/logger.js && node --check server/firebase.js && node --check server/v1/security.js && node --check server/v1/repository.js && node --check server/v1/router.js && node --check scripts/importExcel.js && node --check scripts/firebase/common.js && node --check scripts/firebase/backup.js && node --check scripts/firebase/migrate.js && node --check scripts/firebase/restore.js && node --check scripts/firebase/validate.js"
+    "lint": "node --check server/db.js && node --check server/migrate.js && node --check server/index.js && node --check server/logger.js && node --check server/firebase.js && node --check server/v1/security.js && node --check server/v1/repository.js && node --check server/v1/router.js && node --check scripts/importExcel.js && node --check scripts/migrateRemoteApi.js && node --check scripts/firebase/common.js && node --check scripts/firebase/backup.js && node --check scripts/firebase/migrate.js && node --check scripts/firebase/restore.js && node --check scripts/firebase/validate.js"
   },
   "keywords": [],
   "author": "",

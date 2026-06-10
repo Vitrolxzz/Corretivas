@@ -697,6 +697,13 @@ tbody tr:last-child td {
   overflow-wrap: anywhere;
 }
 
+.cell-note {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .row-actions {
   width: 86px;
   white-space: nowrap;

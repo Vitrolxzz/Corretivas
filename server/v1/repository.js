@@ -51,6 +51,7 @@ const resources = {
       clientName: 'client_name',
       address: 'address',
       reportedProblem: 'reported_problem',
+      notes: 'notes',
       visitDate: 'visit_date',
       visitTime: 'visit_time',
       technician: 'technician',

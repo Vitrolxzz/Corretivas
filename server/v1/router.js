@@ -79,6 +79,7 @@ function appointmentToJson(row) {
     clientName: row.client_name,
     address: row.address,
     reportedProblem: row.reported_problem,
+    notes: row.notes,
     visitDate: dateToJson(row.visit_date),
     visitTime: row.visit_time,
     technician: row.technician,

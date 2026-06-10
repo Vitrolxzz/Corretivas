@@ -89,6 +89,7 @@ const emptyAppointment = {
   clientName: '',
   address: '',
   reportedProblem: '',
+  notes: '',
   visitDate: '',
   visitTime: '',
   technician: '',
@@ -978,6 +979,7 @@ export default function App() {
         clientName: record.clientName,
         address: record.address,
         reportedProblem: record.reportedProblem,
+        notes: record.notes,
         visitDate: record.visitDate,
         visitTime: record.visitTime,
         technician: record.technician,
@@ -1441,6 +1443,13 @@ export default function App() {
                   onChange={(event) => updateAppointment('reportedProblem', event.target.value)}
                 />
               </Field>
+              <Field label="Observacoes">
+                <textarea
+                  rows="3"
+                  value={appointmentForm.notes}
+                  onChange={(event) => updateAppointment('notes', event.target.value)}
+                />
+              </Field>
               <div className="form-grid two-fields">
                 <Field label="Data da visita">
                   <input
@@ -1576,7 +1585,10 @@ export default function App() {
                             </button>
                           </td>
                           <td>{record.address}</td>
-                          <td className="long-cell">{record.reportedProblem}</td>
+                          <td className="long-cell">
+                            <div>{record.reportedProblem}</div>
+                            {record.notes && <small className="cell-note">Obs: {record.notes}</small>}
+                          </td>
                           <td>{record.technician}</td>
                           <td>
                             {formatMoney(record.visitValue)}
@@ -2390,7 +2402,10 @@ function HistoryTables({ history, openClientHistory }) {
                   </button>
                 </td>
                 <td>{formatDate(record.visitDate)}</td>
-                <td className="long-cell">{record.reportedProblem}</td>
+                <td className="long-cell">
+                  <div>{record.reportedProblem}</div>
+                  {record.notes && <small className="cell-note">Obs: {record.notes}</small>}
+                </td>
                 <td>{record.status}</td>
               </tr>
             ))}

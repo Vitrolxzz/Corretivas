@@ -1619,6 +1619,7 @@ List<String> editorFields(String resource) {
         'clientName',
         'address',
         'reportedProblem',
+        'notes',
         'visitDate',
         'visitTime',
         'technician',

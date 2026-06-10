@@ -97,6 +97,7 @@ const schema = [
     client_name TEXT NOT NULL DEFAULT '',
     address TEXT NOT NULL DEFAULT '',
     reported_problem TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
     visit_date TEXT,
     visit_time TEXT,
     technician TEXT NOT NULL DEFAULT '',
@@ -260,6 +261,7 @@ export async function migrate() {
   await ensureColumn('turnstile_photos', 'optimized_width', 'INTEGER');
   await ensureColumn('turnstile_photos', 'optimized_height', 'INTEGER');
   await ensureColumn('audit_logs', 'user_name', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn('appointments', 'notes', "TEXT NOT NULL DEFAULT ''");
 
   const defaultYear = getDefaultYear();
   await query(
