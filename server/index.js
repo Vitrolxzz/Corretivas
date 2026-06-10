@@ -16,6 +16,8 @@ const rootDir = path.resolve(__dirname, '..');
 const distDir = path.join(rootDir, 'dist');
 const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(rootDir, 'data');
 const uploadDir = path.join(dataDir, 'uploads');
+const apkDownloadUrl =
+  process.env.APK_DOWNLOAD_URL || 'https://github.com/Vitrolxzz/Corretivas/releases/latest/download/Corretivas.apk';
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -31,6 +33,10 @@ mkdirSync(uploadDir, { recursive: true });
 
 app.use(express.json({ limit: '25mb' }));
 app.use('/api/uploads', express.static(uploadDir));
+
+app.get(['/Corretivas.apk', '/download/Corretivas.apk', '/downloads/Corretivas.apk'], (_req, res) => {
+  res.redirect(302, apkDownloadUrl);
+});
 
 function basicHealthPayload() {
   return {

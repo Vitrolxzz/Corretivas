@@ -17,6 +17,14 @@ flutter run --dart-define=API_BASE_URL=https://corretivas.up.railway.app
 flutter build apk --debug --dart-define=API_BASE_URL=https://corretivas.up.railway.app
 ```
 
+O APK publicado para instalacao se chama `Corretivas.apk`.
+
+Link direto:
+
+```text
+https://corretivas.up.railway.app/Corretivas.apk
+```
+
 ## Acesso
 
 O aplicativo nao solicita login e senha. Na abertura, o usuario informa apenas o proprio nome.
