@@ -25,12 +25,45 @@ const port = Number(process.env.PORT || 3001);
 const sseClients = new Set();
 app.locals.v1Events = new Set();
 
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3001',
+  'https://corretivas.up.railway.app',
+  'https://corretivas-5e7d7.web.app',
+  'https://corretivas-5e7d7.firebaseapp.com',
+];
+const allowedOrigins = new Set(
+  (process.env.CORS_ORIGINS || defaultAllowedOrigins.join(','))
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+
 const healthOptions = new Set(['Ok', 'Nulo']);
 const appointmentStatuses = new Set(['agendada', 'realizada', 'cancelada']);
 const turnstileStatuses = new Set(['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue']);
 const caseSituations = new Set(['com problema', 'em observação', 'em testes', 'ok']);
 
 mkdirSync(uploadDir, { recursive: true });
+
+app.use((req, res, next) => {
+  const origin = req.get('origin');
+
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Corretivas-Mobile, X-Operator-Name, X-Device-Id, X-FCM-Token');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  }
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
 
 app.use(express.json({ limit: '25mb' }));
 app.use('/api/uploads', express.static(uploadDir));
