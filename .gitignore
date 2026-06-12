@@ -16,3 +16,4 @@ mobile/corretivas_app/build/
 mobile/corretivas_app/android/.gradle/
 mobile/corretivas_app/android/.kotlin/
 mobile/corretivas_app/android/local.properties
+mobile/corretivas_app/android/app/google-services.json
