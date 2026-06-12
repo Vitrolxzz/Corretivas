@@ -243,6 +243,20 @@ function yearStart(year) {
   return `${year}-01-01`;
 }
 
+function normalizeClientText(value) {
+  return String(value || '').trim().toLocaleUpperCase('pt-BR');
+}
+
+function normalizeTechnicianText(value) {
+  const text = String(value || '').trim();
+
+  if (text.toLocaleLowerCase('pt-BR') === 'vittor') {
+    return 'Vittor';
+  }
+
+  return text;
+}
+
 async function ensureColumn(table, column, definition) {
   const existing = await query(`PRAGMA table_info(${table})`);
   const hasColumn = existing.rows.some((row) => row.name === column);
@@ -250,6 +264,81 @@ async function ensureColumn(table, column, definition) {
   if (!hasColumn) {
     await query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
+}
+
+async function normalizeTextColumn(table, column, normalizer) {
+  const { rows } = await query(
+    `SELECT id, ${column} AS value
+     FROM ${table}
+     WHERE ${column} IS NOT NULL AND TRIM(${column}) <> ''`,
+  );
+
+  for (const row of rows) {
+    const normalized = normalizer(row.value);
+
+    if (normalized && normalized !== row.value) {
+      await query(`UPDATE ${table} SET ${column} = $2 WHERE id = $1`, [Number(row.id), normalized]);
+    }
+  }
+}
+
+async function normalizeClientProfiles() {
+  const { rows } = await query(`SELECT id, name, address, contact, notes FROM clients ORDER BY id ASC`);
+  const groups = new Map();
+
+  for (const row of rows) {
+    const normalizedName = normalizeClientText(row.name);
+
+    if (!normalizedName) {
+      continue;
+    }
+
+    if (!groups.has(normalizedName)) {
+      groups.set(normalizedName, []);
+    }
+
+    groups.get(normalizedName).push(row);
+  }
+
+  for (const [name, group] of groups.entries()) {
+    const [keeper, ...duplicates] = group;
+    const merged = {
+      address: group.find((row) => String(row.address || '').trim())?.address || '',
+      contact: group.find((row) => String(row.contact || '').trim())?.contact || '',
+      notes: group.find((row) => String(row.notes || '').trim())?.notes || '',
+    };
+
+    for (const duplicate of duplicates) {
+      await query(`DELETE FROM clients WHERE id = $1`, [Number(duplicate.id)]);
+    }
+
+    await query(
+      `UPDATE clients
+       SET name = $2,
+           address = $3,
+           contact = $4,
+           notes = $5
+       WHERE id = $1`,
+      [Number(keeper.id), name, merged.address, merged.contact, merged.notes],
+    );
+  }
+}
+
+async function normalizeExistingNames() {
+  await normalizeClientProfiles();
+
+  await normalizeTextColumn('corrective_occurrences', 'client', normalizeClientText);
+  await normalizeTextColumn('case_monitors', 'client_name', normalizeClientText);
+  await normalizeTextColumn('command_registrations', 'bakery', normalizeClientText);
+  await normalizeTextColumn('appointments', 'client_name', normalizeClientText);
+  await normalizeTextColumn('turnstiles', 'client_name', normalizeClientText);
+
+  await normalizeTextColumn('technicians', 'name', normalizeTechnicianText);
+  await normalizeTextColumn('corrective_occurrences', 'technician', normalizeTechnicianText);
+  await normalizeTextColumn('appointments', 'technician', normalizeTechnicianText);
+  await normalizeTextColumn('command_registrations', 'exacta_registrar', normalizeTechnicianText);
+  await normalizeTextColumn('command_registrations', 'client_registrar', normalizeTechnicianText);
+  await normalizeTextColumn('audit_logs', 'user_name', normalizeTechnicianText);
 }
 
 export async function migrate() {
@@ -262,6 +351,7 @@ export async function migrate() {
   await ensureColumn('turnstile_photos', 'optimized_height', 'INTEGER');
   await ensureColumn('audit_logs', 'user_name', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'notes', "TEXT NOT NULL DEFAULT ''");
+  await normalizeExistingNames();
 
   const defaultYear = getDefaultYear();
   await query(

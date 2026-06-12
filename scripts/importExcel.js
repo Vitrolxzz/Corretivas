@@ -19,6 +19,20 @@ function cleanText(value) {
   return String(value).replace(/\s+/g, ' ').trim();
 }
 
+function cleanClientName(value) {
+  return cleanText(value).toLocaleUpperCase('pt-BR');
+}
+
+function normalizeTechnicianName(value) {
+  const text = cleanText(value);
+
+  if (text.toLocaleLowerCase('pt-BR') === 'vittor') {
+    return 'Vittor';
+  }
+
+  return text;
+}
+
 function toIsoDateFromParts(day, month, year) {
   const fullYear = year < 100 ? 2000 + year : year;
   const date = new Date(Date.UTC(fullYear, month - 1, day));
@@ -130,13 +144,13 @@ async function getOrCreatePeriod(year) {
 function rowToRecord(row) {
   return {
     occurrenceDate: parseDate(row[0]),
-    client: cleanText(row[1]),
+    client: cleanClientName(row[1]),
     contact: cleanText(row[2]),
     requesterName: cleanText(row[3]),
     reason: cleanText(row[4]),
     resolution: cleanText(row[5]),
     difficulty: normalizeDifficulty(row[6]),
-    technician: cleanText(row[7]),
+    technician: normalizeTechnicianName(row[7]),
     backupStatus: normalizeHealth(row[8]),
     firewallStatus: normalizeHealth(row[9]),
     powerOptionsStatus: normalizeHealth(row[10]),

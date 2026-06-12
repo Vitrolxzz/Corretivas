@@ -146,6 +146,20 @@ function normalizeForForm(record) {
   );
 }
 
+function normalizeClientInput(value) {
+  return String(value || '').toLocaleUpperCase('pt-BR');
+}
+
+function normalizeTechnicianInput(value) {
+  const text = String(value || '');
+
+  if (text.toLocaleLowerCase('pt-BR') === 'vittor') {
+    return 'Vittor';
+  }
+
+  return text;
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -762,23 +776,40 @@ export default function App() {
   }, [appointmentsSearch, appointmentsTechnician, appointmentsStartDate, appointmentsEndDate]);
 
   function updateCorrective(field, value) {
-    setCorrectiveForm((current) => ({ ...current, [field]: value }));
+    const normalizedValue = field === 'client'
+      ? normalizeClientInput(value)
+      : field === 'technician'
+        ? normalizeTechnicianInput(value)
+        : value;
+    setCorrectiveForm((current) => ({ ...current, [field]: normalizedValue }));
   }
 
   function updateCase(field, value) {
-    setCaseForm((current) => ({ ...current, [field]: value }));
+    const normalizedValue = field === 'clientName' ? normalizeClientInput(value) : value;
+    setCaseForm((current) => ({ ...current, [field]: normalizedValue }));
   }
 
   function updateCommand(field, value) {
-    setCommandForm((current) => ({ ...current, [field]: value }));
+    const normalizedValue = field === 'bakery'
+      ? normalizeClientInput(value)
+      : field === 'exactaRegistrar' || field === 'clientRegistrar'
+        ? normalizeTechnicianInput(value)
+        : value;
+    setCommandForm((current) => ({ ...current, [field]: normalizedValue }));
   }
 
   function updateAppointment(field, value) {
-    setAppointmentForm((current) => ({ ...current, [field]: value }));
+    const normalizedValue = field === 'clientName'
+      ? normalizeClientInput(value)
+      : field === 'technician'
+        ? normalizeTechnicianInput(value)
+        : value;
+    setAppointmentForm((current) => ({ ...current, [field]: normalizedValue }));
   }
 
   function updateTurnstile(field, value) {
-    setTurnstileForm((current) => ({ ...current, [field]: value }));
+    const normalizedValue = field === 'clientName' ? normalizeClientInput(value) : value;
+    setTurnstileForm((current) => ({ ...current, [field]: normalizedValue }));
   }
 
   async function refreshOperationalData() {

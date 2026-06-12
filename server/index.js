@@ -59,6 +59,20 @@ function cleanText(value) {
   return String(value).trim();
 }
 
+function cleanClientName(value) {
+  return cleanText(value).toLocaleUpperCase('pt-BR');
+}
+
+function normalizeTechnicianName(value) {
+  const text = cleanText(value);
+
+  if (text.toLocaleLowerCase('pt-BR') === 'vittor') {
+    return 'Vittor';
+  }
+
+  return text;
+}
+
 function cleanDate(value) {
   const text = cleanText(value);
 
@@ -420,13 +434,13 @@ function turnstilePhotoToJson(row) {
 function correctivePayload(body) {
   return {
     occurrenceDate: cleanDate(body.occurrenceDate),
-    client: cleanText(body.client),
+    client: cleanClientName(body.client),
     contact: cleanText(body.contact),
     requesterName: cleanText(body.requesterName),
     reason: cleanText(body.reason),
     resolution: cleanText(body.resolution),
     difficulty: cleanDifficulty(body.difficulty),
-    technician: cleanText(body.technician),
+    technician: normalizeTechnicianName(body.technician),
     backupStatus: cleanHealthStatus(body.backupStatus),
     firewallStatus: cleanHealthStatus(body.firewallStatus),
     powerOptionsStatus: cleanHealthStatus(body.powerOptionsStatus),
@@ -436,7 +450,7 @@ function correctivePayload(body) {
 
 function casePayload(body) {
   return {
-    clientName: cleanText(body.clientName),
+    clientName: cleanClientName(body.clientName),
     startDate: cleanDate(body.startDate),
     situation: cleanCaseSituation(body.situation),
   };
@@ -444,24 +458,24 @@ function casePayload(body) {
 
 function commandPayload(body) {
   return {
-    bakery: cleanText(body.bakery),
+    bakery: cleanClientName(body.bakery),
     dmConf: cleanText(body.dmConf),
     dmCad: cleanText(body.dmCad),
     dmImp: cleanText(body.dmImp),
-    exactaRegistrar: cleanText(body.exactaRegistrar),
-    clientRegistrar: cleanText(body.clientRegistrar),
+    exactaRegistrar: normalizeTechnicianName(body.exactaRegistrar),
+    clientRegistrar: normalizeTechnicianName(body.clientRegistrar),
   };
 }
 
 function appointmentPayload(body) {
   return {
-    clientName: cleanText(body.clientName),
+    clientName: cleanClientName(body.clientName),
     address: cleanText(body.address),
     reportedProblem: cleanText(body.reportedProblem),
     notes: cleanText(body.notes),
     visitDate: cleanDate(body.visitDate),
     visitTime: cleanTime(body.visitTime),
-    technician: cleanText(body.technician),
+    technician: normalizeTechnicianName(body.technician),
     visitValue: cleanMoney(body.visitValue),
     partsValue: cleanMoney(body.partsValue),
     status: cleanAppointmentStatus(body.status),
@@ -470,7 +484,7 @@ function appointmentPayload(body) {
 
 function turnstilePayload(body) {
   return {
-    clientName: cleanText(body.clientName),
+    clientName: cleanClientName(body.clientName),
     model: cleanText(body.model),
     clientAddress: cleanText(body.clientAddress),
     expectedDeliveryDate: cleanDate(body.expectedDeliveryDate),

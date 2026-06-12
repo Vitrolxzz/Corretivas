@@ -1666,6 +1666,14 @@ dynamic editorValue(String resource, String key, String value) {
   final text = value.trim();
   final nullableFields = {...dateFieldKeys, 'visitTime'};
 
+  if (isClientField(resource, key)) {
+    return text.toUpperCase();
+  }
+
+  if (isTechnicianField(resource, key)) {
+    return normalizeTechnicianInput(text);
+  }
+
   if (numberFieldKeys.contains(key)) {
     if (text.isEmpty) return key == 'difficulty' ? null : 0;
     return num.tryParse(text.replaceAll(',', '.')) ?? text;
@@ -1684,6 +1692,29 @@ dynamic editorValue(String resource, String key, String value) {
   }
 
   return text;
+}
+
+bool isClientField(String resource, String key) {
+  return (resource == 'clientes' && key == 'name') ||
+      (resource == 'ocorrencias' && key == 'client') ||
+      (resource == 'agendamentos' && key == 'clientName') ||
+      (resource == 'comandas' && key == 'bakery') ||
+      (resource == 'catracas' && key == 'clientName');
+}
+
+bool isTechnicianField(String resource, String key) {
+  return (resource == 'tecnicos' && key == 'name') ||
+      key == 'technician' ||
+      key == 'exactaRegistrar' ||
+      key == 'clientRegistrar';
+}
+
+String normalizeTechnicianInput(String value) {
+  if (value.toLowerCase() == 'vittor') {
+    return 'Vittor';
+  }
+
+  return value;
 }
 
 String normalizeDateInput(String value) {

@@ -5,6 +5,7 @@ const resources = {
   clientes: {
     table: 'clients',
     collection: 'clientes',
+    clientFields: ['name'],
     fields: {
       name: 'name',
       address: 'address',
@@ -15,6 +16,7 @@ const resources = {
   tecnicos: {
     table: 'technicians',
     collection: 'tecnicos',
+    technicianFields: ['name'],
     fields: {
       name: 'name',
       email: 'email',
@@ -27,6 +29,8 @@ const resources = {
     table: 'corrective_occurrences',
     collection: 'ocorrencias',
     dateFields: ['occurrenceDate', 'solutionDate'],
+    clientFields: ['client'],
+    technicianFields: ['technician'],
     fields: {
       periodId: 'period_id',
       occurrenceDate: 'occurrence_date',
@@ -47,6 +51,8 @@ const resources = {
     table: 'appointments',
     collection: 'agendamentos',
     dateFields: ['visitDate'],
+    clientFields: ['clientName'],
+    technicianFields: ['technician'],
     fields: {
       clientName: 'client_name',
       address: 'address',
@@ -63,6 +69,8 @@ const resources = {
   comandas: {
     table: 'command_registrations',
     collection: 'comandas',
+    clientFields: ['bakery'],
+    technicianFields: ['exactaRegistrar', 'clientRegistrar'],
     fields: {
       periodId: 'period_id',
       bakery: 'bakery',
@@ -77,6 +85,7 @@ const resources = {
     table: 'turnstiles',
     collection: 'catracas',
     dateFields: ['expectedDeliveryDate'],
+    clientFields: ['clientName'],
     fields: {
       clientName: 'client_name',
       model: 'model',
@@ -160,12 +169,38 @@ function normalizeDate(value) {
   throw error;
 }
 
+function normalizeClientName(value) {
+  return String(value || '').trim().toLocaleUpperCase('pt-BR');
+}
+
+function normalizeTechnicianName(value) {
+  const text = String(value || '').trim();
+
+  if (text.toLocaleLowerCase('pt-BR') === 'vittor') {
+    return 'Vittor';
+  }
+
+  return text;
+}
+
 function normalizePayload(body, config) {
   const normalized = { ...body };
 
   for (const field of config.dateFields || []) {
     if (Object.prototype.hasOwnProperty.call(normalized, field)) {
       normalized[field] = normalizeDate(normalized[field]);
+    }
+  }
+
+  for (const field of config.clientFields || []) {
+    if (Object.prototype.hasOwnProperty.call(normalized, field)) {
+      normalized[field] = normalizeClientName(normalized[field]);
+    }
+  }
+
+  for (const field of config.technicianFields || []) {
+    if (Object.prototype.hasOwnProperty.call(normalized, field)) {
+      normalized[field] = normalizeTechnicianName(normalized[field]);
     }
   }
 
