@@ -163,6 +163,31 @@ Quando qualquer registro e criado, alterado, excluido ou recebe foto, a API emit
 
 O Android escuta esse stream e atualiza as telas. O web atual continua usando `/api/events`; ambos sao alimentados pelo mesmo `broadcast` interno.
 
+## Push de agendamentos
+
+Ao cadastrar uma visita tecnica pelo web ou pelo Android, a API monta a notificacao:
+
+```text
+Nova manutencao agendada!
+-CLIENTE, dd/mm/aaaa-
+```
+
+O evento e enviado pelo mesmo `broadcast` interno. Celulares com o app aberto exibem o pop-up local imediatamente e ignoram o aviso quando o proprio aparelho criou o agendamento, usando o header `X-Device-Id`.
+
+O Android tambem registra o token FCM em:
+
+```text
+POST /api/v1/fcm/tokens
+```
+
+Quando Firebase Admin estiver configurado no servidor, a API envia o push para os tokens salvos. Para funcionar com o app fechado, configure:
+
+- `mobile/corretivas_app/android/app/google-services.json` no projeto Android.
+- `FIREBASE_PROJECT_ID` no Railway.
+- `FIREBASE_SERVICE_ACCOUNT_JSON` ou `GOOGLE_APPLICATION_CREDENTIALS` no Railway.
+
+Sem essas credenciais, o sistema segue funcionando por tempo real enquanto o app estiver aberto, e registra log informando que o envio FCM foi ignorado.
+
 ## Funcionamento offline Android
 
 O app Flutter possui fila local em `SharedPreferences`.

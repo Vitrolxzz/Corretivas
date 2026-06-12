@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import { closePool, query, withTransaction } from './db.js';
 import { initializeFirebase } from './firebase.js';
 import { migrate } from './migrate.js';
+import { buildAppointmentScheduledNotification, sendAppointmentScheduledNotification } from './notifications.js';
 import { createV1Router } from './v1/router.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1156,8 +1157,11 @@ app.post(
       ],
     );
 
-    broadcast({ table: 'appointments', action: 'created' });
-    res.status(201).json({ record: appointmentToJson(inserted.rows[0]) });
+    const record = appointmentToJson(inserted.rows[0]);
+    const notification = buildAppointmentScheduledNotification(record);
+    broadcast({ table: 'appointments', action: 'created', id: record.id, notification });
+    await sendAppointmentScheduledNotification(record);
+    res.status(201).json({ record });
   }),
 );
 

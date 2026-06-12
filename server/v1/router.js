@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { query } from '../db.js';
 import { firebaseAuth, firebaseConfigured, firebaseMessaging, firebaseStorageBucket } from '../firebase.js';
 import { logger } from '../logger.js';
+import { buildAppointmentScheduledNotification, sendAppointmentScheduledNotification } from '../notifications.js';
 import { auditLog, createRecord, deleteRecord, getRecord, listRecords, updateRecord } from './repository.js';
 import { requireAuth, signApiToken, validateLocalPassword } from './security.js';
 
@@ -497,11 +498,18 @@ export function createV1Router({ broadcast }) {
     authGate(readRoles),
     asyncRoute(async (req, res) => {
       const payload = fcmSchema.parse(req.body);
-      const record = await createRecord('fcm_tokens', {
-        userId: req.user.uid,
-        token: payload.token,
-        platform: payload.platform,
-      });
+      const { rows } = await query(
+        `INSERT INTO fcm_tokens (user_id, token, platform)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (token)
+         DO UPDATE SET
+           user_id = excluded.user_id,
+           platform = excluded.platform,
+           updated_at = datetime('now')
+         RETURNING *`,
+        [req.user.uid, payload.token, payload.platform],
+      );
+      const record = rows[0];
       await createRecord('auditoria', {
         userId: req.user.uid,
         userEmail: req.user.email,
@@ -807,7 +815,17 @@ export function createV1Router({ broadcast }) {
       asyncRoute(async (req, res) => {
         const record = await createRecord(domain, req.body || {});
         await auditLog({ user: req.user, operation: 'create', resource: domain, recordId: record.id, afterValue: record });
-        broadcast({ version: 'v1', resource: domain, action: 'created', id: record.id });
+        const event = { version: 'v1', resource: domain, action: 'created', id: record.id };
+
+        if (domain === 'agendamentos') {
+          event.notification = buildAppointmentScheduledNotification(record);
+          event.sourceDeviceId = String(req.get('x-device-id') || '');
+          await sendAppointmentScheduledNotification(record, {
+            excludeToken: req.get('x-fcm-token'),
+          });
+        }
+
+        broadcast(event);
         res.status(201).json({ record });
       }),
     );

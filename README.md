@@ -108,6 +108,10 @@ A API de anexos recebe imagens em Base64, o que ja deixa a estrutura preparada p
 
 A central de notificacoes mantem o contador de itens nao lidos. Ao abrir uma notificacao ou marcar todas como lidas, essa leitura fica persistida no banco local.
 
+Quando uma visita tecnica e cadastrada, a API envia o evento de notificacao `Nova manutencao agendada!` para os celulares conectados. O corpo mostra apenas cliente e data no formato `-CLIENTE, dd/mm/aaaa-`.
+
+Com o app aberto, o aviso aparece pelo canal em tempo real `/api/v1/sync/events`. Para receber push com o app fechado, configure Firebase Cloud Messaging no Android e as credenciais Firebase Admin no servidor Railway.
+
 ## Performance
 
 O calendario visual e carregado sob demanda. A primeira tela abre sem carregar o pacote do calendario, que so e baixado quando o modo `Calendario` de agendamentos e aberto.

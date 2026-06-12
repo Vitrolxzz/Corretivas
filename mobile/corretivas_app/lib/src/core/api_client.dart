@@ -6,13 +6,23 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
-  ApiClient({required this.baseUrl, required this.operatorName});
+  ApiClient({
+    required this.baseUrl,
+    required this.operatorName,
+    required this.deviceId,
+    this.notificationToken,
+  });
 
   final String baseUrl;
   final String operatorName;
+  final String deviceId;
+  String? notificationToken;
 
-  ApiClient forOperator(String name) =>
-      ApiClient(baseUrl: baseUrl, operatorName: name);
+  ApiClient forOperator(String name) => ApiClient(
+      baseUrl: baseUrl,
+      operatorName: name,
+      deviceId: deviceId,
+      notificationToken: notificationToken);
 
   Future<Map<String, dynamic>> get(String path) async {
     return _send('GET', path);
@@ -41,7 +51,12 @@ class ApiClient {
       'Content-Type': 'application/json',
       'X-Corretivas-Mobile': 'true',
       'X-Operator-Name': operatorName.trim(),
+      'X-Device-Id': deviceId,
     };
+
+    if (notificationToken?.trim().isNotEmpty == true) {
+      headers['X-FCM-Token'] = notificationToken!.trim();
+    }
 
     final uri = Uri.parse('$baseUrl/api/v1$path');
     final request = http.Request(method, uri)..headers.addAll(headers);
@@ -69,6 +84,11 @@ class ApiClient {
         http.Request('GET', Uri.parse('$baseUrl/api/v1/sync/events'));
     request.headers['X-Corretivas-Mobile'] = 'true';
     request.headers['X-Operator-Name'] = operatorName.trim();
+    request.headers['X-Device-Id'] = deviceId;
+
+    if (notificationToken?.trim().isNotEmpty == true) {
+      request.headers['X-FCM-Token'] = notificationToken!.trim();
+    }
 
     final response = await request.send();
 

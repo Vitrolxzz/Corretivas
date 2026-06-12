@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart' as charts;
 import 'package:flutter/material.dart';
@@ -7,9 +8,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'src/core/api_client.dart';
+import 'src/core/notification_service.dart';
 import 'src/core/theme.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await MobileNotificationService.initialize();
   runApp(const CorretivasMobile());
 }
 
@@ -42,6 +46,7 @@ class OperatorAccessPage extends StatefulWidget {
 class _OperatorAccessPageState extends State<OperatorAccessPage> {
   static const _operatorNameKey = 'operator_name';
   static const _apiBaseUrlKey = 'api_base_url';
+  static const _deviceIdKey = 'device_id';
 
   final _operatorName = TextEditingController();
   final _apiBase = TextEditingController(text: AppConfig.apiBaseUrl);
@@ -60,6 +65,22 @@ class _OperatorAccessPageState extends State<OperatorAccessPage> {
 
     _operatorName.text = prefs.getString(_operatorNameKey) ?? '';
     _apiBase.text = prefs.getString(_apiBaseUrlKey) ?? AppConfig.apiBaseUrl;
+  }
+
+  Future<String> _loadOrCreateDeviceId(SharedPreferences prefs) async {
+    final saved = prefs.getString(_deviceIdKey)?.trim();
+
+    if (saved != null && saved.isNotEmpty) {
+      return saved;
+    }
+
+    final random = Random.secure();
+    final deviceId = List<int>.generate(16, (_) => random.nextInt(256))
+        .map((value) => value.toRadixString(16).padLeft(2, '0'))
+        .join();
+
+    await prefs.setString(_deviceIdKey, deviceId);
+    return deviceId;
   }
 
   @override
@@ -93,9 +114,14 @@ class _OperatorAccessPageState extends State<OperatorAccessPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_operatorNameKey, operatorName);
       await prefs.setString(_apiBaseUrlKey, apiBase);
+      final deviceId = await _loadOrCreateDeviceId(prefs);
 
       if (!mounted) return;
-      final api = ApiClient(baseUrl: apiBase, operatorName: operatorName);
+      final api = ApiClient(
+        baseUrl: apiBase,
+        operatorName: operatorName,
+        deviceId: deviceId,
+      );
       Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => HomePage(api: api)));
     } catch (error) {
@@ -183,12 +209,23 @@ class _HomePageState extends State<HomePage> {
   final _queue = OfflineQueue();
   int _index = 0;
   StreamSubscription<Map<String, dynamic>>? _events;
+  StreamSubscription<String>? _tokenEvents;
   int _refreshKey = 0;
 
   @override
   void initState() {
     super.initState();
-    _events = widget.api.events().listen((_) {
+    MobileNotificationService.registerToken(widget.api)
+        .catchError((_) => false);
+    _tokenEvents = MobileNotificationService.tokenStream.listen((_) {
+      MobileNotificationService.registerToken(widget.api)
+          .catchError((_) => false);
+    });
+    _events = widget.api.events().listen((event) {
+      MobileNotificationService.handleRealtimeEvent(
+        event,
+        deviceId: widget.api.deviceId,
+      ).catchError((_) {});
       if (mounted) {
         setState(() => _refreshKey++);
       }
@@ -199,6 +236,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _events?.cancel();
+    _tokenEvents?.cancel();
     super.dispose();
   }
 
