@@ -29,6 +29,8 @@ const defaultAllowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3001',
   'https://corretivas.up.railway.app',
+  'https://corretivas-1b.web.app',
+  'https://corretivas-1b.firebaseapp.com',
   'https://corretivas-5e7d7.web.app',
   'https://corretivas-5e7d7.firebaseapp.com',
 ];
