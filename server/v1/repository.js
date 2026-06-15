@@ -267,6 +267,32 @@ export async function listRecords(resource, options = {}) {
     return rows.map((row) => ({ id: row.name, ...row }));
   }
 
+  if (resource === 'agendamentos') {
+    const { rows } = await query(
+      `SELECT appointments.*, (
+        SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
+       ) AS photo_count
+       FROM appointments
+       ORDER BY id DESC
+       LIMIT $1`,
+      [limit],
+    );
+    return rows.map((row) => toApi(row, config));
+  }
+
+  if (resource === 'catracas') {
+    const { rows } = await query(
+      `SELECT turnstiles.*, (
+        SELECT COUNT(*) FROM turnstile_photos WHERE turnstile_id = turnstiles.id
+       ) AS photo_count
+       FROM turnstiles
+       ORDER BY id DESC
+       LIMIT $1`,
+      [limit],
+    );
+    return rows.map((row) => toApi(row, config));
+  }
+
   const { rows } = await query(`SELECT * FROM ${config.table} ORDER BY id DESC LIMIT $1`, [limit]);
   return rows.map((row) => toApi(row, config));
 }
@@ -282,6 +308,30 @@ export async function getRecord(resource, id) {
     }
 
     return { id: doc.id, ...doc.data() };
+  }
+
+  if (resource === 'agendamentos') {
+    const { rows } = await query(
+      `SELECT appointments.*, (
+        SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
+       ) AS photo_count
+       FROM appointments
+       WHERE id = $1`,
+      [Number(id)],
+    );
+    return rows[0] ? toApi(rows[0], config) : null;
+  }
+
+  if (resource === 'catracas') {
+    const { rows } = await query(
+      `SELECT turnstiles.*, (
+        SELECT COUNT(*) FROM turnstile_photos WHERE turnstile_id = turnstiles.id
+       ) AS photo_count
+       FROM turnstiles
+       WHERE id = $1`,
+      [Number(id)],
+    );
+    return rows[0] ? toApi(rows[0], config) : null;
   }
 
   const { rows } = await query(`SELECT * FROM ${config.table} WHERE id = $1`, [Number(id)]);

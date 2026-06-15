@@ -528,6 +528,13 @@ export function createV1Router({ broadcast }) {
     authGate(technicianWritableRoles),
     asyncRoute(async (req, res) => {
       const payload = photoSchema.parse(req.body);
+      const appointment = await getRecord('agendamentos', req.params.id);
+
+      if (!appointment) {
+        res.status(404).json({ error: 'Agendamento nao encontrado.' });
+        return;
+      }
+
       const dataUrlMatch = payload.dataBase64.match(/^data:([^;]+);base64,(.+)$/);
       const mimeType = dataUrlMatch?.[1] || payload.mimeType;
       const base64 = dataUrlMatch?.[2] || payload.dataBase64;
@@ -598,6 +605,95 @@ export function createV1Router({ broadcast }) {
         afterValue: { fileName, publicPath, sizeBytes: optimized.data.length },
       });
       broadcast({ version: 'v1', resource: 'catracas', action: 'photo-uploaded', id: req.params.id });
+      res.status(201).json({
+        record: {
+          fileName,
+          publicPath,
+          mimeType: 'image/jpeg',
+          sizeBytes: optimized.data.length,
+          originalSizeBytes: originalBuffer.length,
+          optimizedWidth: optimized.info.width,
+          optimizedHeight: optimized.info.height,
+        },
+      });
+    }),
+  );
+
+  router.post(
+    '/agendamentos/:id/anexos',
+    authGate(technicianWritableRoles),
+    asyncRoute(async (req, res) => {
+      const payload = photoSchema.parse(req.body);
+      const dataUrlMatch = payload.dataBase64.match(/^data:([^;]+);base64,(.+)$/);
+      const mimeType = dataUrlMatch?.[1] || payload.mimeType;
+      const base64 = dataUrlMatch?.[2] || payload.dataBase64;
+
+      if (!mimeType.startsWith('image/')) {
+        res.status(400).json({ error: 'Apenas imagens podem ser anexadas.' });
+        return;
+      }
+
+      const originalBuffer = Buffer.from(base64, 'base64');
+      const optimized = await sharp(originalBuffer, { failOn: 'warning' })
+        .rotate()
+        .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82, mozjpeg: true })
+        .toBuffer({ resolveWithObject: true });
+
+      const fileName = `${randomUUID()}.jpg`;
+      const storagePath = `anexos/agendamentos/${req.params.id}/${fileName}`;
+      let publicPath = '';
+      const bucket = firebaseStorageBucket();
+
+      if (process.env.DATA_BACKEND === 'firebase' && bucket) {
+        const file = bucket.file(storagePath);
+        await file.save(optimized.data, {
+          metadata: {
+            contentType: 'image/jpeg',
+            metadata: {
+              originalName: payload.fileName,
+              uploadedBy: payload.uploadedBy,
+            },
+          },
+        });
+        publicPath = `gs://${bucket.name}/${storagePath}`;
+      } else {
+        const relativeDir = path.join('agendamentos', String(req.params.id));
+        const absoluteDir = path.join(uploadDir, relativeDir);
+        mkdirSync(absoluteDir, { recursive: true });
+        const absolutePath = path.join(absoluteDir, fileName);
+        writeFileSync(absolutePath, optimized.data);
+        publicPath = `/api/uploads/${relativeDir.replaceAll(path.sep, '/')}/${fileName}`;
+        await query(
+          `INSERT INTO appointment_photos (
+            appointment_id, file_name, original_name, mime_type, size_bytes,
+            original_size_bytes, optimized_width, optimized_height,
+            storage_path, public_path, uploaded_by
+          )
+          VALUES ($1, $2, $3, 'image/jpeg', $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            Number(req.params.id),
+            fileName,
+            payload.fileName,
+            optimized.data.length,
+            originalBuffer.length,
+            optimized.info.width,
+            optimized.info.height,
+            absolutePath,
+            publicPath,
+            payload.uploadedBy,
+          ],
+        );
+      }
+
+      await auditLog({
+        user: req.user,
+        operation: 'upload',
+        resource: 'agendamentos/anexos',
+        recordId: req.params.id,
+        afterValue: { fileName, publicPath, sizeBytes: optimized.data.length },
+      });
+      broadcast({ version: 'v1', resource: 'agendamentos', action: 'photo-uploaded', id: req.params.id });
       res.status(201).json({
         record: {
           fileName,

@@ -55,7 +55,7 @@ async function commitInBatches(db, collection, rows, table) {
   return written;
 }
 
-async function uploadPhotos(bucket, rows) {
+async function uploadPhotos(bucket, rows, options) {
   if (!bucket) {
     return { skipped: rows.length, uploaded: 0 };
   }
@@ -69,7 +69,7 @@ async function uploadPhotos(bucket, rows) {
       continue;
     }
 
-    const destination = `anexos/catracas/${row.turnstile_id}/${path.basename(row.storage_path)}`;
+    const destination = `anexos/${options.directory}/${row[options.idField]}/${path.basename(row.storage_path)}`;
     await bucket.upload(row.storage_path, {
       destination,
       metadata: {
@@ -105,7 +105,16 @@ for (const [table, collection] of tableCollections) {
   report[collection] = await commitInBatches(db, collection, rows, table);
 }
 
-report.storage = await uploadPhotos(bucket, snapshot.turnstile_photos || []);
+report.storage = {
+  catracas: await uploadPhotos(bucket, snapshot.turnstile_photos || [], {
+    directory: 'catracas',
+    idField: 'turnstile_id',
+  }),
+  agendamentos: await uploadPhotos(bucket, snapshot.appointment_photos || [], {
+    directory: 'agendamentos',
+    idField: 'appointment_id',
+  }),
+};
 await db.collection('relatorios').doc(`migracao-${Date.now()}`).set({
   type: 'sql-to-firebase',
   createdAt: new Date().toISOString(),

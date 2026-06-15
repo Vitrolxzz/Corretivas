@@ -147,6 +147,23 @@ const schema = [
   )`,
   `CREATE INDEX IF NOT EXISTS turnstile_photo_turnstile_idx
     ON turnstile_photos (turnstile_id, created_at DESC, id DESC)`,
+  `CREATE TABLE IF NOT EXISTS appointment_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL DEFAULT '',
+    original_name TEXT NOT NULL DEFAULT '',
+    mime_type TEXT NOT NULL DEFAULT '',
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    original_size_bytes INTEGER NOT NULL DEFAULT 0,
+    optimized_width INTEGER,
+    optimized_height INTEGER,
+    storage_path TEXT NOT NULL DEFAULT '',
+    public_path TEXT NOT NULL DEFAULT '',
+    uploaded_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS appointment_photo_appointment_idx
+    ON appointment_photos (appointment_id, created_at DESC, id DESC)`,
   `CREATE TABLE IF NOT EXISTS notification_reads (
     notification_key TEXT PRIMARY KEY,
     read_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -349,6 +366,9 @@ export async function migrate() {
   await ensureColumn('turnstile_photos', 'original_size_bytes', 'INTEGER NOT NULL DEFAULT 0');
   await ensureColumn('turnstile_photos', 'optimized_width', 'INTEGER');
   await ensureColumn('turnstile_photos', 'optimized_height', 'INTEGER');
+  await ensureColumn('appointment_photos', 'original_size_bytes', 'INTEGER NOT NULL DEFAULT 0');
+  await ensureColumn('appointment_photos', 'optimized_width', 'INTEGER');
+  await ensureColumn('appointment_photos', 'optimized_height', 'INTEGER');
   await ensureColumn('audit_logs', 'user_name', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'notes', "TEXT NOT NULL DEFAULT ''");
   await normalizeExistingNames();

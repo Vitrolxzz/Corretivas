@@ -704,6 +704,14 @@ tbody tr:last-child td {
   line-height: 1.35;
 }
 
+.photo-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .row-actions {
   width: 86px;
   white-space: nowrap;

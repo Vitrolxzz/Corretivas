@@ -228,20 +228,19 @@ function photoFilePath(photo) {
   return null;
 }
 
-async function importPhotos(snapshot, turnstileIdMap) {
-  const photos = snapshot.turnstile_photos || [];
+async function importPhotos(photos, idMap, options) {
   let imported = 0;
 
   for (const photo of photos) {
-    const remoteTurnstileId = turnstileIdMap.get(String(photo.turnstile_id));
+    const remoteRecordId = idMap.get(String(photo[options.idField]));
     const filePath = photoFilePath(photo);
 
-    if (!remoteTurnstileId || !filePath) {
-      console.warn(`Foto ignorada por falta de catraca/arquivo: ${photo.id}`);
+    if (!remoteRecordId || !filePath) {
+      console.warn(`Foto ignorada por falta de ${options.label}/arquivo: ${photo.id}`);
       continue;
     }
 
-    await request('POST', `/api/turnstiles/${remoteTurnstileId}/photos`, {
+    await request('POST', `/api/${options.resource}/${remoteRecordId}/photos`, {
       fileName: photo.original_name || photo.file_name || 'foto.jpg',
       mimeType: photo.mime_type || 'image/jpeg',
       uploadedBy: photo.uploaded_by || operatorName,
@@ -281,6 +280,16 @@ for (const config of resources) {
   console.log(`${config.resource}: ${rows.length} importados`);
 }
 
-const importedPhotos = await importPhotos(snapshot, idMaps.catracas);
-console.log(`fotos de catracas: ${importedPhotos} importadas`);
+const importedTurnstilePhotos = await importPhotos(snapshot.turnstile_photos || [], idMaps.catracas, {
+  resource: 'turnstiles',
+  idField: 'turnstile_id',
+  label: 'catraca',
+});
+const importedAppointmentPhotos = await importPhotos(snapshot.appointment_photos || [], idMaps.agendamentos, {
+  resource: 'appointments',
+  idField: 'appointment_id',
+  label: 'agendamento',
+});
+console.log(`fotos de catracas: ${importedTurnstilePhotos} importadas`);
+console.log(`fotos de agendamentos: ${importedAppointmentPhotos} importadas`);
 console.log('Migracao finalizada.');

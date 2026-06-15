@@ -474,6 +474,7 @@ export default function App() {
   const [appointmentForm, setAppointmentForm] = useState(emptyAppointment);
   const [editingAppointmentId, setEditingAppointmentId] = useState(null);
   const [appointmentsMode, setAppointmentsMode] = useState('list');
+  const [appointmentPhotos, setAppointmentPhotos] = useState([]);
 
   const [turnstiles, setTurnstiles] = useState([]);
   const [turnstilesTotal, setTurnstilesTotal] = useState(0);
@@ -656,6 +657,16 @@ export default function App() {
     setAppointments(data.records);
     setAppointmentsTotal(data.total);
   }, [appointmentsPage, appointmentsSearch, appointmentsTechnician, appointmentsStartDate, appointmentsEndDate]);
+
+  const loadAppointmentPhotos = useCallback(async (id) => {
+    if (!id) {
+      setAppointmentPhotos([]);
+      return;
+    }
+
+    const data = await request(`/api/appointments/${id}/photos`);
+    setAppointmentPhotos(data.records);
+  }, []);
 
   const loadTurnstiles = useCallback(async () => {
     const params = new URLSearchParams({ limit: '200' });
@@ -883,10 +894,24 @@ export default function App() {
     const path = editingAppointmentId ? `/api/appointments/${editingAppointmentId}` : '/api/appointments';
 
     try {
-      await request(path, { method, body: appointmentForm });
-      setAppointmentForm(emptyAppointment);
-      setEditingAppointmentId(null);
-      await Promise.all([loadAppointments(), loadDailyReport(), refreshOperationalData()]);
+      const data = await request(path, { method, body: appointmentForm });
+      const id = editingAppointmentId || data.record.id;
+      setEditingAppointmentId(id);
+      setAppointmentForm(
+        normalizeForForm({
+          clientName: data.record.clientName,
+          address: data.record.address,
+          reportedProblem: data.record.reportedProblem,
+          notes: data.record.notes,
+          visitDate: data.record.visitDate,
+          visitTime: data.record.visitTime,
+          technician: data.record.technician,
+          visitValue: data.record.visitValue,
+          partsValue: data.record.partsValue,
+          status: data.record.status,
+        }),
+      );
+      await Promise.all([loadAppointments(), loadDailyReport(), refreshOperationalData(), loadAppointmentPhotos(id)]);
       showToast(editingAppointmentId ? 'Agendamento atualizado.' : 'Agendamento cadastrado.');
     } catch (error) {
       showToast(error.message, 'error');
@@ -1019,6 +1044,7 @@ export default function App() {
         status: record.status,
       }),
     );
+    loadAppointmentPhotos(record.id).catch((error) => showToast(error.message, 'error'));
     setActiveTab('appointments');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1185,6 +1211,35 @@ export default function App() {
 
       event.target.value = '';
       await Promise.all([loadTurnstilePhotos(editingTurnstileId), loadTurnstiles(), refreshOperationalData()]);
+      showToast('Fotos anexadas.');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  }
+
+  async function uploadAppointmentPhotos(event) {
+    const files = Array.from(event.target.files || []);
+
+    if (!editingAppointmentId || !files.length) {
+      return;
+    }
+
+    try {
+      for (const file of files) {
+        const dataBase64 = await fileToDataUrl(file);
+        await request(`/api/appointments/${editingAppointmentId}/photos`, {
+          method: 'POST',
+          body: {
+            fileName: file.name,
+            mimeType: file.type,
+            dataBase64,
+            uploadedBy: 'web',
+          },
+        });
+      }
+
+      event.target.value = '';
+      await Promise.all([loadAppointmentPhotos(editingAppointmentId), loadAppointments(), refreshOperationalData()]);
       showToast('Fotos anexadas.');
     } catch (error) {
       showToast(error.message, 'error');
@@ -1450,6 +1505,7 @@ export default function App() {
                   onClick={() => {
                     setEditingAppointmentId(null);
                     setAppointmentForm(emptyAppointment);
+                    setAppointmentPhotos([]);
                   }}
                 >
                   <X size={18} />
@@ -1538,6 +1594,28 @@ export default function App() {
                 {editingAppointmentId ? 'Salvar edicao' : 'Cadastrar'}
               </button>
             </div>
+
+            {editingAppointmentId && (
+              <div className="photo-panel">
+                <div className="section-title">
+                  <h2>Anexo de fotos</h2>
+                  <label className="secondary-button small file-button">
+                    <Upload size={16} />
+                    Enviar
+                    <input type="file" accept="image/*" multiple onChange={uploadAppointmentPhotos} />
+                  </label>
+                </div>
+                <div className="photo-grid">
+                  {appointmentPhotos.map((photo) => (
+                    <a key={photo.id} href={photoDownloadUrl(photo.id, 'appointments')} title="Baixar imagem">
+                      <img src={photo.publicPath} alt={photo.originalName || photo.fileName} />
+                      <span>{photo.originalName || photo.fileName}</span>
+                    </a>
+                  ))}
+                  {!appointmentPhotos.length && <EmptyState label="Nenhuma foto anexada." />}
+                </div>
+              </div>
+            )}
           </form>
 
           <div className="list-panel">
@@ -1598,6 +1676,7 @@ export default function App() {
                         <th>Problema</th>
                         <th>Tecnico</th>
                         <th>Valores</th>
+                        <th>Fotos</th>
                         <th>Status</th>
                         <th className="actions-heading">Acoes</th>
                       </tr>
@@ -1625,6 +1704,15 @@ export default function App() {
                             {formatMoney(record.visitValue)}
                             <br />
                             {formatMoney(record.partsValue)}
+                          </td>
+                          <td>
+                            {record.photoCount > 0 ? (
+                              <span className="photo-count">
+                                <ImageIcon size={13} /> {record.photoCount}
+                              </span>
+                            ) : (
+                              0
+                            )}
                           </td>
                           <td>
                             <StatusPill value={record.status} />

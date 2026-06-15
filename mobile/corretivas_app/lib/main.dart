@@ -256,6 +256,7 @@ class _HomePageState extends State<HomePage> {
           title: 'Agendamentos',
           resource: 'agendamentos',
           icon: Icons.calendar_month_rounded,
+          photos: true,
           refreshKey: _refreshKey),
       ResourcePage(
           api: widget.api,
@@ -1041,7 +1042,8 @@ class _ResourcePageState extends State<ResourcePage> {
     if (image == null) return;
 
     final bytes = await image.readAsBytes();
-    await widget.api.post('/catracas/${record['id']}/anexos', {
+    final id = Uri.encodeComponent(record['id']?.toString() ?? '');
+    await widget.api.post('/${widget.resource}/$id/anexos', {
       'fileName': image.name,
       'mimeType': image.mimeType ?? 'image/jpeg',
       'dataBase64':
@@ -1383,7 +1385,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
 
     final bytes = await image.readAsBytes();
     await widget.api
-        .post('/catracas/${Uri.encodeComponent(_recordId)}/anexos', {
+        .post('/${widget.resource}/${Uri.encodeComponent(_recordId)}/anexos', {
       'fileName': image.name,
       'mimeType': image.mimeType ?? 'image/jpeg',
       'dataBase64':

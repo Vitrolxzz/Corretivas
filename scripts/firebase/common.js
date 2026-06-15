@@ -21,6 +21,7 @@ export const tableCollections = [
   ['command_registrations', 'comandas'],
   ['turnstiles', 'catracas'],
   ['turnstile_photos', 'anexos'],
+  ['appointment_photos', 'anexos_agendamentos'],
   ['notification_reads', 'notificacoes_lidas'],
   ['fcm_tokens', 'fcm_tokens'],
   ['audit_logs', 'auditoria'],

@@ -51,6 +51,6 @@ export function exportUrl(resource, format, params = {}) {
   return `${apiBase}/api/export/${resource}.${format}${suffix}`;
 }
 
-export function photoDownloadUrl(photoId) {
-  return `${apiBase}/api/turnstiles/photos/${encodeURIComponent(photoId)}/download`;
+export function photoDownloadUrl(photoId, resource = 'turnstiles') {
+  return `${apiBase}/api/${resource}/photos/${encodeURIComponent(photoId)}/download`;
 }

@@ -407,6 +407,7 @@ function appointmentToJson(row) {
     partsValue: Number(row.parts_value || 0),
     status: row.status,
     conflictCount: Number(row.conflict_count || 0),
+    photoCount: Number(row.photo_count || 0),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
   };
@@ -456,6 +457,23 @@ function turnstilePhotoToJson(row) {
   return {
     id: Number(row.id),
     turnstileId: Number(row.turnstile_id),
+    fileName: row.file_name,
+    originalName: row.original_name,
+    mimeType: row.mime_type,
+    sizeBytes: Number(row.size_bytes || 0),
+    originalSizeBytes: Number(row.original_size_bytes || 0),
+    optimizedWidth: row.optimized_width === null || row.optimized_width === undefined ? null : Number(row.optimized_width),
+    optimizedHeight: row.optimized_height === null || row.optimized_height === undefined ? null : Number(row.optimized_height),
+    publicPath: row.public_path,
+    uploadedBy: row.uploaded_by,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+  };
+}
+
+function appointmentPhotoToJson(row) {
+  return {
+    id: Number(row.id),
+    appointmentId: Number(row.appointment_id),
     fileName: row.file_name,
     originalName: row.original_name,
     mimeType: row.mime_type,
@@ -1132,7 +1150,9 @@ app.get(
           AND same.technician = appointments.technician
           AND same.status <> 'cancelada'
           AND appointments.status <> 'cancelada'
-      ) AS conflict_count
+      ) AS conflict_count, (
+        SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
+      ) AS photo_count
        FROM appointments
        WHERE ${where}
        ORDER BY COALESCE(visit_date, '9999-12-31') ASC, COALESCE(visit_time, '') ASC, id DESC
@@ -1150,10 +1170,27 @@ app.get(
 );
 
 app.get(
+  '/api/appointments/photos/:photoId/download',
+  asyncRoute(async (req, res) => {
+    const { rows } = await query('SELECT * FROM appointment_photos WHERE id = $1', [Number(req.params.photoId)]);
+
+    if (!rows[0]) {
+      const error = new Error('Foto nao encontrada.');
+      error.status = 404;
+      throw error;
+    }
+
+    res.download(rows[0].storage_path, rows[0].original_name || rows[0].file_name);
+  }),
+);
+
+app.get(
   '/api/appointments/:id',
   asyncRoute(async (req, res) => {
     const { rows } = await query(
-      `SELECT appointments.*, 0 AS conflict_count
+      `SELECT appointments.*, 0 AS conflict_count, (
+        SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
+       ) AS photo_count
        FROM appointments
        WHERE id = $1`,
       [Number(req.params.id)],
@@ -1277,6 +1314,95 @@ app.delete(
     await query('DELETE FROM appointments WHERE id = $1', [Number(req.params.id)]);
     broadcast({ table: 'appointments', action: 'deleted', id: Number(req.params.id) });
     res.status(204).end();
+  }),
+);
+
+app.get(
+  '/api/appointments/:id/photos',
+  asyncRoute(async (req, res) => {
+    const { rows } = await query(
+      `SELECT *
+       FROM appointment_photos
+       WHERE appointment_id = $1
+       ORDER BY created_at DESC, id DESC`,
+      [Number(req.params.id)],
+    );
+
+    res.json({ records: rows.map(appointmentPhotoToJson) });
+  }),
+);
+
+app.post(
+  '/api/appointments/:id/photos',
+  asyncRoute(async (req, res) => {
+    const appointmentId = Number(req.params.id);
+    const existing = await query('SELECT id FROM appointments WHERE id = $1', [appointmentId]);
+
+    if (!existing.rows[0]) {
+      const error = new Error('Agendamento nao encontrado.');
+      error.status = 404;
+      throw error;
+    }
+
+    const originalName = cleanText(req.body?.fileName || req.body?.originalName || 'foto.jpg');
+    const uploadedBy = cleanText(req.body?.uploadedBy);
+    let mimeType = cleanText(req.body?.mimeType);
+    let base64 = cleanText(req.body?.dataBase64 || req.body?.data);
+    const dataUrlMatch = base64.match(/^data:([^;]+);base64,(.+)$/);
+
+    if (dataUrlMatch) {
+      mimeType = mimeType || dataUrlMatch[1];
+      base64 = dataUrlMatch[2];
+    }
+
+    if (!mimeType.startsWith('image/')) {
+      const error = new Error('Apenas imagens podem ser anexadas.');
+      error.status = 400;
+      throw error;
+    }
+
+    const buffer = Buffer.from(base64, 'base64');
+
+    if (!buffer.length) {
+      const error = new Error('Imagem invalida.');
+      error.status = 400;
+      throw error;
+    }
+
+    const optimized = await optimizeImage(buffer);
+    const fileName = `${randomUUID()}${optimized.extension}`;
+    const relativeDir = path.join('agendamentos', String(appointmentId));
+    const absoluteDir = path.join(uploadDir, relativeDir);
+    mkdirSync(absoluteDir, { recursive: true });
+    const storagePath = path.join(absoluteDir, fileName);
+    writeFileSync(storagePath, optimized.buffer);
+    const publicPath = `/api/uploads/${relativeDir.replaceAll(path.sep, '/')}/${fileName}`;
+
+    const inserted = await query(
+      `INSERT INTO appointment_photos (
+        appointment_id, file_name, original_name, mime_type, size_bytes,
+        original_size_bytes, optimized_width, optimized_height,
+        storage_path, public_path, uploaded_by
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *`,
+      [
+        appointmentId,
+        fileName,
+        originalName,
+        optimized.mimeType,
+        optimized.buffer.length,
+        buffer.length,
+        optimized.width,
+        optimized.height,
+        storagePath,
+        publicPath,
+        uploadedBy,
+      ],
+    );
+
+    broadcast({ table: 'appointment_photos', action: 'created', appointmentId });
+    res.status(201).json({ record: appointmentPhotoToJson(inserted.rows[0]) });
   }),
 );
 
@@ -2171,7 +2297,9 @@ app.get(
         [name],
       ),
       query(
-        `SELECT appointments.*, 0 AS conflict_count
+        `SELECT appointments.*, 0 AS conflict_count, (
+          SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
+         ) AS photo_count
          FROM appointments
          WHERE client_name = $1 COLLATE NOCASE
          ORDER BY COALESCE(visit_date, '0001-01-01') DESC, id DESC`,
@@ -2341,7 +2469,9 @@ app.get(
 
     const [appointments, correctives, commands] = await Promise.all([
       query(
-        `SELECT appointments.*, 0 AS conflict_count
+        `SELECT appointments.*, 0 AS conflict_count, (
+          SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
+         ) AS photo_count
          FROM appointments
          WHERE technician = $1 COLLATE NOCASE${appointmentDateClause}
          ORDER BY COALESCE(visit_date, '0001-01-01') DESC, id DESC`,
