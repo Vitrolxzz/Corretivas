@@ -6,6 +6,7 @@ data/*.sqlite-wal
 data/uploads/
 backups/
 firebase-service-account*.json
+secrets/
 .env
 npm-debug.log*
 *.local

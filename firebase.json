@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "corretivas-1b",
+    "site": "corretivas-a1d3d",
     "public": "dist",
     "ignore": [
       "firebase.json",
