@@ -54,6 +54,16 @@ const difficultyOptions = [
 ];
 const appointmentStatuses = ['agendada', 'realizada', 'cancelada'];
 const turnstileStatuses = ['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue'];
+const dashboardMetricTiles = [
+  { metric: 'todayAppointments', icon: CalendarDays, label: 'Agendamentos do dia', stat: 'todayAppointments' },
+  { metric: 'upcomingAppointments', icon: CalendarDays, label: 'Proximas visitas', stat: 'upcomingAppointments' },
+  { metric: 'openCorrectives', icon: ClipboardList, label: 'Ocorrencias abertas', stat: 'openCorrectives' },
+  { metric: 'completedCorrectivesMonth', icon: CheckCircle2, label: 'Concluidas no mes', stat: 'completedCorrectivesMonth' },
+  { metric: 'pendingTurnstiles', icon: Wrench, label: 'Catracas pendentes', stat: 'pendingTurnstiles' },
+  { metric: 'dueSoonTurnstiles', icon: AlertTriangle, label: 'Prazos proximos', stat: 'dueSoonTurnstiles' },
+  { metric: 'attendancesMonth', icon: MonitorCheck, label: 'Atendimentos no mes', stat: 'attendancesMonth' },
+  { metric: 'commands', icon: ListChecks, label: 'Comandas', stat: 'commands' },
+];
 
 const emptyCorrective = {
   occurrenceDate: '',
@@ -210,15 +220,97 @@ function PeriodBadge({ period }) {
   return <span className={`period-badge ${period.status}`}>{period.year}</span>;
 }
 
-function StatTile({ icon: Icon, label, value, accent }) {
+function StatTile({ icon: Icon, label, value, accent, onClick }) {
+  const Wrapper = onClick ? 'button' : 'div';
+
   return (
-    <div className={`stat-tile ${accent ? `accent-${accent}` : ''}`}>
+    <Wrapper className={`stat-tile ${accent ? `accent-${accent}` : ''} ${onClick ? 'clickable' : ''}`} type={onClick ? 'button' : undefined} onClick={onClick}>
       <Icon size={19} />
       <div>
         <strong>{value ?? '-'}</strong>
         <span>{label}</span>
       </div>
-    </div>
+    </Wrapper>
+  );
+}
+
+function formatReportValue(value, type) {
+  if (value === null || value === undefined || value === '') {
+    return '-';
+  }
+
+  if (type === 'date') {
+    return formatDate(value);
+  }
+
+  if (type === 'datetime') {
+    return new Date(value).toLocaleString('pt-BR');
+  }
+
+  if (type === 'money') {
+    return formatMoney(value);
+  }
+
+  return String(value);
+}
+
+function DashboardReportPanel({ report, loading, onClose }) {
+  if (loading) {
+    return (
+      <section className="list-panel detail-panel dashboard-report-panel">
+        <div className="section-title">
+          <h2>Carregando relatorio</h2>
+          <RefreshCw className="spin" size={18} />
+        </div>
+      </section>
+    );
+  }
+
+  if (!report) {
+    return null;
+  }
+
+  const columns = report.columns || [];
+  const records = report.records || [];
+
+  return (
+    <section className="list-panel detail-panel dashboard-report-panel">
+      <div className="section-title">
+        <div>
+          <h2>{report.title}</h2>
+          <p>{report.description}</p>
+        </div>
+        <IconAction title="Fechar relatorio" onClick={onClose}>
+          <X size={18} />
+        </IconAction>
+      </div>
+      <div className="report-summary">
+        <StatTile icon={FileText} label="Total encontrado" value={report.total ?? records.length} />
+        <StatTile icon={ListChecks} label="Exibindo" value={records.length} />
+        {report.month && <StatTile icon={CalendarDays} label="Mes de referencia" value={report.month} />}
+      </div>
+      <div className="table-wrap compact-table">
+        <table>
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th key={column.key}>{column.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((record, index) => (
+              <tr key={`${record.id || 'row'}-${index}`}>
+                {columns.map((column) => (
+                  <td key={column.key}>{formatReportValue(record[column.key], column.type)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!records.length && <EmptyState label="Nenhum registro encontrado para este indicador." />}
+      </div>
+    </section>
   );
 }
 
@@ -439,6 +531,8 @@ export default function App() {
   const [periods, setPeriods] = useState([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState('');
   const [dashboard, setDashboard] = useState(null);
+  const [dashboardReport, setDashboardReport] = useState(null);
+  const [dashboardReportLoading, setDashboardReportLoading] = useState(false);
   const [clients, setClients] = useState([]);
   const [technicianOptions, setTechnicianOptions] = useState([]);
   const [notifications, setNotifications] = useState({ count: 0, notifications: [] });
@@ -1274,6 +1368,26 @@ export default function App() {
     }
   }
 
+  async function openDashboardReport(metric) {
+    setDashboardReportLoading(true);
+    setDashboardReport(null);
+
+    try {
+      const params = new URLSearchParams({ metric });
+
+      if (selectedPeriodId) {
+        params.set('periodId', selectedPeriodId);
+      }
+
+      const report = await request(`/api/dashboard/report?${params}`);
+      setDashboardReport(report);
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setDashboardReportLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="app-shell">
@@ -1338,15 +1452,25 @@ export default function App() {
       {activeTab === 'dashboard' && (
         <section className="workspace">
           <section className="stats-grid expanded">
-            <StatTile icon={CalendarDays} label="Agendamentos do dia" value={dashboard?.stats?.todayAppointments} />
-            <StatTile icon={CalendarDays} label="Proximas visitas" value={dashboard?.stats?.upcomingAppointments} />
-            <StatTile icon={ClipboardList} label="Ocorrencias abertas" value={dashboard?.stats?.openCorrectives} />
-            <StatTile icon={CheckCircle2} label="Concluidas no mes" value={dashboard?.stats?.completedCorrectivesMonth} />
-            <StatTile icon={Wrench} label="Catracas pendentes" value={dashboard?.stats?.pendingTurnstiles} />
-            <StatTile icon={AlertTriangle} label="Prazos proximos" value={dashboard?.stats?.dueSoonTurnstiles} />
-            <StatTile icon={MonitorCheck} label="Atendimentos no mes" value={dashboard?.stats?.attendancesMonth} />
-            <StatTile icon={ListChecks} label="Comandas" value={dashboard?.stats?.commands} />
+            {dashboardMetricTiles.map((tile) => (
+              <StatTile
+                key={tile.metric}
+                icon={tile.icon}
+                label={tile.label}
+                value={dashboard?.stats?.[tile.stat]}
+                onClick={() => openDashboardReport(tile.metric)}
+              />
+            ))}
           </section>
+
+          <DashboardReportPanel
+            report={dashboardReport}
+            loading={dashboardReportLoading}
+            onClose={() => {
+              setDashboardReport(null);
+              setDashboardReportLoading(false);
+            }}
+          />
 
           {(clientHistory || technicianHistory) && (
             <section className="list-panel detail-panel">

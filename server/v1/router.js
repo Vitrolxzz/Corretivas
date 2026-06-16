@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { z } from 'zod';
+import { buildDashboardReport } from '../dashboardReports.js';
 import { query } from '../db.js';
 import { firebaseAuth, firebaseConfigured, firebaseMessaging, firebaseStorageBucket } from '../firebase.js';
 import { logger } from '../logger.js';
@@ -511,6 +512,18 @@ export function createV1Router({ broadcast }) {
             .reverse(),
         },
       });
+    }),
+  );
+
+  router.get(
+    '/dashboard/report',
+    authGate(readRoles),
+    asyncRoute(async (req, res) => {
+      const report = await buildDashboardReport(req.query.metric, {
+        periodId: req.query.periodId,
+      });
+
+      res.json(report);
     }),
   );
 

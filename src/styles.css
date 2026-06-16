@@ -328,10 +328,21 @@ h2 {
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   background: var(--panel-soft);
+  color: var(--text);
+  text-align: left;
 }
 
 .stat-tile svg {
   color: var(--accent);
+}
+
+.stat-tile.clickable {
+  cursor: pointer;
+}
+
+.stat-tile.clickable:hover {
+  border-color: rgba(50, 211, 180, 0.5);
+  background: rgba(50, 211, 180, 0.08);
 }
 
 .stat-tile strong {
@@ -876,6 +887,19 @@ tr:hover td.row-actions {
 
 .detail-panel {
   border-color: rgba(50, 211, 180, 0.28);
+}
+
+.dashboard-report-panel .section-title p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .detail-grid {

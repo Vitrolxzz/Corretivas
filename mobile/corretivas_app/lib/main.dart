@@ -474,36 +474,44 @@ class _DashboardPageState extends State<DashboardPage> {
                   style: const TextStyle(color: CorretivasTheme.danger)),
             ),
           const SizedBox(height: 10),
-          _MetricGrid(items: [
+          _MetricGrid(onMetricTap: _openMetricReport, items: [
             _MetricItem(
+                metric: 'todayAppointments',
                 icon: Icons.calendar_today_rounded,
                 label: 'Agendamentos do dia',
                 value: numberText(stats['todayAppointments'])),
             _MetricItem(
+                metric: 'upcomingAppointments',
                 icon: Icons.event_available_rounded,
                 label: 'Proximas visitas',
                 value: numberText(stats['upcomingAppointments'])),
             _MetricItem(
+                metric: 'openCorrectives',
                 icon: Icons.assignment_rounded,
                 label: 'Ocorrencias abertas',
                 value: numberText(stats['openCorrectives'])),
             _MetricItem(
+                metric: 'completedCorrectivesMonth',
                 icon: Icons.check_circle_rounded,
                 label: 'Concluidas no mes',
                 value: numberText(stats['completedCorrectivesMonth'])),
             _MetricItem(
+                metric: 'pendingTurnstiles',
                 icon: Icons.build_rounded,
                 label: 'Catracas pendentes',
                 value: numberText(stats['pendingTurnstiles'])),
             _MetricItem(
+                metric: 'dueSoonTurnstiles',
                 icon: Icons.warning_rounded,
                 label: 'Prazos proximos',
                 value: numberText(stats['dueSoonTurnstiles'])),
             _MetricItem(
+                metric: 'attendancesMonth',
                 icon: Icons.fact_check_rounded,
                 label: 'Atendimentos no mes',
                 value: numberText(stats['attendancesMonth'])),
             _MetricItem(
+                metric: 'commands',
                 icon: Icons.checklist_rounded,
                 label: 'Comandas',
                 value: numberText(stats['commands'])),
@@ -543,21 +551,32 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     );
   }
+
+  void _openMetricReport(String metric) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => DashboardReportPage(api: widget.api, metric: metric),
+    ));
+  }
 }
 
 class _MetricItem {
   const _MetricItem(
-      {required this.icon, required this.label, required this.value});
+      {required this.metric,
+      required this.icon,
+      required this.label,
+      required this.value});
 
+  final String metric;
   final IconData icon;
   final String label;
   final String value;
 }
 
 class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.items});
+  const _MetricGrid({required this.items, required this.onMetricTap});
 
   final List<_MetricItem> items;
+  final ValueChanged<String> onMetricTap;
 
   @override
   Widget build(BuildContext context) {
@@ -568,36 +587,236 @@ class _MetricGrid extends StatelessWidget {
       childAspectRatio: 1.35,
       mainAxisSpacing: 8,
       crossAxisSpacing: 8,
-      children: items.map((item) => _MetricTile(item: item)).toList(),
+      children: items
+          .map((item) =>
+              _MetricTile(item: item, onTap: () => onMetricTap(item.metric)))
+          .toList(),
     );
   }
 }
 
 class _MetricTile extends StatelessWidget {
-  const _MetricTile({required this.item});
+  const _MetricTile({required this.item, required this.onTap});
 
   final _MetricItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(item.icon, color: CorretivasTheme.accent, size: 22),
+              const Spacer(),
+              Text(item.value,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 24)),
+              const SizedBox(height: 2),
+              Text(item.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: CorretivasTheme.muted, fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class DashboardReportPage extends StatefulWidget {
+  const DashboardReportPage(
+      {required this.api, required this.metric, super.key});
+
+  final ApiClient api;
+  final String metric;
+
+  @override
+  State<DashboardReportPage> createState() => _DashboardReportPageState();
+}
+
+class _DashboardReportPageState extends State<DashboardReportPage> {
+  Map<String, dynamic>? _report;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final data = await widget.api.get(
+          '/dashboard/report?metric=${Uri.encodeComponent(widget.metric)}');
+      if (mounted) {
+        setState(() => _report = data);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = apiErrorMessage(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = listOfMaps(_report?['columns']);
+    final records = listOfMaps(_report?['records']);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_report?['title']?.toString() ?? 'Relatorio'),
+        actions: [
+          IconButton(
+              tooltip: 'Atualizar',
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded)),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(14),
+          children: [
+            if (_loading) const LinearProgressIndicator(),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(_error!,
+                    style: const TextStyle(color: CorretivasTheme.danger)),
+              ),
+            if (_report != null) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_report!['title']?.toString() ?? 'Relatorio',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 6),
+                      Text(_report!['description']?.toString() ?? '',
+                          style: const TextStyle(color: CorretivasTheme.muted)),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _ReportBadge(
+                              label: 'Total',
+                              value: numberText(_report!['total'])),
+                          _ReportBadge(
+                              label: 'Exibindo',
+                              value: records.length.toString()),
+                          if ((_report!['month'] ?? '').toString().isNotEmpty)
+                            _ReportBadge(
+                                label: 'Mes',
+                                value: _report!['month'].toString()),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (records.isEmpty)
+                const _DashboardEmpty(
+                    label: 'Nenhum registro encontrado para este indicador.')
+              else
+                ...records.map((record) =>
+                    _DashboardReportRecord(columns: columns, record: record)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportBadge extends StatelessWidget {
+  const _ReportBadge({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: CorretivasTheme.line),
+        borderRadius: BorderRadius.circular(10),
+        color: CorretivasTheme.panelSoft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style:
+                  const TextStyle(color: CorretivasTheme.muted, fontSize: 11)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardReportRecord extends StatelessWidget {
+  const _DashboardReportRecord({required this.columns, required this.record});
+
+  final List<Map<String, dynamic>> columns;
+  final Map<String, dynamic> record;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(item.icon, color: CorretivasTheme.accent, size: 22),
-            const Spacer(),
-            Text(item.value,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 24)),
-            const SizedBox(height: 2),
-            Text(item.label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: CorretivasTheme.muted, fontSize: 12)),
-          ],
+          children: columns.map((column) {
+            final key = column['key']?.toString() ?? '';
+            final label = column['label']?.toString() ?? key;
+            final type = column['type']?.toString() ?? 'text';
+            final value = formatReportValue(record[key], type);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          color: CorretivasTheme.muted, fontSize: 12)),
+                  const SizedBox(height: 2),
+                  SelectableText(value),
+                ],
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -1900,6 +2119,48 @@ String formatDateText(dynamic value) {
 
   final date = text.substring(0, 10).split('-');
   return '${date[2]}/${date[1]}/${date[0]}';
+}
+
+String formatDateTimeText(dynamic value) {
+  final text = value?.toString() ?? '';
+
+  if (text.isEmpty) {
+    return '-';
+  }
+
+  final date = formatDateText(text);
+  final timeMatch = RegExp(r'T(\d{2}):(\d{2})').firstMatch(text);
+
+  if (timeMatch == null) {
+    return date;
+  }
+
+  return '$date ${timeMatch.group(1)}:${timeMatch.group(2)}';
+}
+
+String formatMoneyText(dynamic value) {
+  final fixed = numberValue(value).toStringAsFixed(2).replaceAll('.', ',');
+  return 'R\$ $fixed';
+}
+
+String formatReportValue(dynamic value, String type) {
+  if (value == null || value.toString().trim().isEmpty) {
+    return '-';
+  }
+
+  if (type == 'date') {
+    return formatDateText(value);
+  }
+
+  if (type == 'datetime') {
+    return formatDateTimeText(value);
+  }
+
+  if (type == 'money') {
+    return formatMoneyText(value);
+  }
+
+  return value.toString();
 }
 
 List<String> detailFields(String resource, Map<String, dynamic> record) {

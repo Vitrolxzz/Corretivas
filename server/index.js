@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { normalizeClientName } from './clientNames.js';
 import { closePool, query, withTransaction } from './db.js';
+import { buildDashboardReport } from './dashboardReports.js';
 import { initializeFirebase } from './firebase.js';
 import { migrate } from './migrate.js';
 import { buildAppointmentScheduledNotification, sendAppointmentScheduledNotification } from './notifications.js';
@@ -1156,6 +1157,17 @@ app.get(
           .reverse(),
       },
     });
+  }),
+);
+
+app.get(
+  '/api/dashboard/report',
+  asyncRoute(async (req, res) => {
+    const report = await buildDashboardReport(req.query.metric, {
+      periodId: req.query.periodId,
+    });
+
+    res.json(report);
   }),
 );
 
