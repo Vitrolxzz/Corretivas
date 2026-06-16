@@ -54,7 +54,7 @@ No emulador Android local tambem e possivel usar `http://10.0.2.2:3001`. Em celu
 
 As listas de agendamentos, ocorrencias, comandas, catracas, clientes e tecnicos sao clicaveis.
 
-Ao tocar em um item, o app abre a tela de detalhes com todos os campos do registro e acoes de editar, excluir, atualizar e enviar foto em agendamentos e catracas.
+Ao tocar em um item, o app abre a tela de detalhes com todos os campos do registro e acoes de editar, excluir, atualizar, enviar foto e abrir imagem em agendamentos e catracas.
 
 O dashboard mobile consome `/api/v1/dashboard` e exibe os mesmos indicadores principais do dashboard web.
 
@@ -65,4 +65,5 @@ Em agendamentos, o campo `Observacoes` permite registrar pecas pendentes, orient
 - O app nao acessa Firebase diretamente.
 - Consultas, cadastros, edicoes, exclusoes, fotos e eventos passam por `/api/v1`.
 - As fotos de agendamentos e catracas usam a API centralizada e podem ser armazenadas no volume do servidor enquanto o Firebase Storage nao estiver ativo.
+- Nomes de clientes passam pela API e podem ser consolidados por aliases, evitando separar o mesmo cliente em variacoes de cadastro.
 - Operacoes feitas offline entram em fila local e podem ser reenviadas pelo botao de sincronizacao.

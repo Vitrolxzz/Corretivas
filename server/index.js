@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { normalizeClientName } from './clientNames.js';
 import { closePool, query, withTransaction } from './db.js';
 import { initializeFirebase } from './firebase.js';
 import { migrate } from './migrate.js';
@@ -98,7 +99,7 @@ function cleanText(value) {
 }
 
 function cleanClientName(value) {
-  return cleanText(value).toLocaleUpperCase('pt-BR');
+  return normalizeClientName(cleanText(value));
 }
 
 function normalizeTechnicianName(value) {

@@ -1398,6 +1398,38 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
         .showSnackBar(const SnackBar(content: Text('Foto enviada.')));
   }
 
+  Future<void> _openPhotos() async {
+    if (_recordId.isEmpty) return;
+
+    try {
+      final data = await widget.api
+          .get('/${widget.resource}/${Uri.encodeComponent(_recordId)}/anexos');
+      final photos = listOfMaps(data['records']);
+
+      if (!mounted) return;
+
+      if (photos.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Nenhuma imagem anexada.')));
+        return;
+      }
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => _PhotoGallerySheet(
+          apiBaseUrl: widget.api.baseUrl,
+          photos: photos,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Nao foi possivel abrir imagem: ${apiErrorMessage(error)}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final fields = detailFields(widget.resource, _record);
@@ -1466,6 +1498,7 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
                   label: fieldLabel(key),
                   value: detailValue(_record[key]),
                 )),
+            if (widget.photos) _OpenImageField(onTap: _openPhotos),
           ],
         ),
       ),
@@ -1491,6 +1524,114 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OpenImageField extends StatelessWidget {
+  const _OpenImageField({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        onTap: onTap,
+        leading: const Icon(Icons.image_rounded, color: CorretivasTheme.accent),
+        title: const Text('Abrir imagem'),
+        trailing: const Icon(Icons.chevron_right_rounded),
+      ),
+    );
+  }
+}
+
+class _PhotoGallerySheet extends StatelessWidget {
+  const _PhotoGallerySheet({required this.apiBaseUrl, required this.photos});
+
+  final String apiBaseUrl;
+  final List<Map<String, dynamic>> photos;
+
+  String _imageUrl(Map<String, dynamic> photo) {
+    final raw =
+        (photo['publicUrl'] ?? photo['publicPath'] ?? '').toString().trim();
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
+    }
+
+    if (raw.startsWith('/')) {
+      return '$apiBaseUrl$raw';
+    }
+
+    return raw;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.82,
+        minChildSize: 0.45,
+        maxChildSize: 0.95,
+        builder: (context, controller) => ListView.separated(
+          controller: controller,
+          padding: const EdgeInsets.all(14),
+          itemCount: photos.length + 1,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Row(
+                children: [
+                  const Icon(Icons.image_rounded,
+                      color: CorretivasTheme.accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text('Imagens anexadas',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              );
+            }
+
+            final photo = photos[index - 1];
+            final imageUrl = _imageUrl(photo);
+            final label = (photo['originalName'] ?? photo['fileName'] ?? '')
+                .toString()
+                .trim();
+
+            return Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Text('Imagem indisponivel',
+                            style: TextStyle(color: CorretivasTheme.muted)),
+                      ),
+                    ),
+                  ),
+                  if (label.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(label,
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1536,7 +1677,7 @@ String recordTitle(Map<String, dynamic> record) {
 }
 
 String recordSubtitle(Map<String, dynamic> record) {
-  final ignored = {'id', 'createdAt', 'updatedAt'};
+  final ignored = {'id', 'createdAt', 'updatedAt', 'photoCount', 'photo_count'};
   return record.entries
       .where((entry) =>
           !ignored.contains(entry.key) &&
@@ -1626,6 +1767,8 @@ List<String> detailFields(String resource, Map<String, dynamic> record) {
 Set<String> hiddenDetailFields(String resource) {
   return switch (resource) {
     'ocorrencias' => {'periodId', 'sourceHash'},
+    'agendamentos' => {'photoCount', 'photo_count'},
+    'catracas' => {'photoCount', 'photo_count'},
     _ => const <String>{},
   };
 }

@@ -20,6 +20,46 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..', '..');
 const uploadDir = path.join(rootDir, 'data', 'uploads');
 
+function requestOrigin(req) {
+  const forwardedProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();
+  const forwardedHost = String(req.get('x-forwarded-host') || '').split(',')[0].trim();
+  const proto = forwardedProto || req.protocol || 'http';
+  const host = forwardedHost || req.get('host') || '';
+  return host ? `${proto}://${host}` : '';
+}
+
+function publicPhotoUrl(req, publicPath) {
+  const text = String(publicPath || '').trim();
+
+  if (!text || /^https?:\/\//i.test(text) || text.startsWith('gs://')) {
+    return text;
+  }
+
+  if (text.startsWith('/')) {
+    return `${requestOrigin(req)}${text}`;
+  }
+
+  return text;
+}
+
+function photoRecordToJson(req, row, ownerKey) {
+  return {
+    id: String(row.id),
+    [ownerKey]: String(row[ownerKey] || ''),
+    fileName: row.file_name,
+    originalName: row.original_name,
+    mimeType: row.mime_type,
+    sizeBytes: Number(row.size_bytes || 0),
+    originalSizeBytes: Number(row.original_size_bytes || 0),
+    optimizedWidth: row.optimized_width === null || row.optimized_width === undefined ? null : Number(row.optimized_width),
+    optimizedHeight: row.optimized_height === null || row.optimized_height === undefined ? null : Number(row.optimized_height),
+    publicPath: row.public_path,
+    publicUrl: publicPhotoUrl(req, row.public_path),
+    uploadedBy: row.uploaded_by,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+  };
+}
+
 function todayText() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -528,10 +568,10 @@ export function createV1Router({ broadcast }) {
     authGate(technicianWritableRoles),
     asyncRoute(async (req, res) => {
       const payload = photoSchema.parse(req.body);
-      const appointment = await getRecord('agendamentos', req.params.id);
+      const turnstile = await getRecord('catracas', req.params.id);
 
-      if (!appointment) {
-        res.status(404).json({ error: 'Agendamento nao encontrado.' });
+      if (!turnstile) {
+        res.status(404).json({ error: 'Catraca nao encontrada.' });
         return;
       }
 
@@ -619,11 +659,34 @@ export function createV1Router({ broadcast }) {
     }),
   );
 
+  router.get(
+    '/catracas/:id/anexos',
+    authGate(readRoles),
+    asyncRoute(async (req, res) => {
+      const { rows } = await query(
+        `SELECT *
+         FROM turnstile_photos
+         WHERE turnstile_id = $1
+         ORDER BY created_at DESC, id DESC`,
+        [Number(req.params.id)],
+      );
+
+      res.json({ records: rows.map((row) => photoRecordToJson(req, row, 'turnstile_id')) });
+    }),
+  );
+
   router.post(
     '/agendamentos/:id/anexos',
     authGate(technicianWritableRoles),
     asyncRoute(async (req, res) => {
       const payload = photoSchema.parse(req.body);
+      const appointment = await getRecord('agendamentos', req.params.id);
+
+      if (!appointment) {
+        res.status(404).json({ error: 'Agendamento nao encontrado.' });
+        return;
+      }
+
       const dataUrlMatch = payload.dataBase64.match(/^data:([^;]+);base64,(.+)$/);
       const mimeType = dataUrlMatch?.[1] || payload.mimeType;
       const base64 = dataUrlMatch?.[2] || payload.dataBase64;
@@ -705,6 +768,22 @@ export function createV1Router({ broadcast }) {
           optimizedHeight: optimized.info.height,
         },
       });
+    }),
+  );
+
+  router.get(
+    '/agendamentos/:id/anexos',
+    authGate(readRoles),
+    asyncRoute(async (req, res) => {
+      const { rows } = await query(
+        `SELECT *
+         FROM appointment_photos
+         WHERE appointment_id = $1
+         ORDER BY created_at DESC, id DESC`,
+        [Number(req.params.id)],
+      );
+
+      res.json({ records: rows.map((row) => photoRecordToJson(req, row, 'appointment_id')) });
     }),
   );
 

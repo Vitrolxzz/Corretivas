@@ -2,6 +2,7 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import readXlsxFile from 'read-excel-file/node';
+import { normalizeClientName } from '../server/clientNames.js';
 import { closePool, query } from '../server/db.js';
 import { migrate } from '../server/migrate.js';
 
@@ -20,7 +21,7 @@ function cleanText(value) {
 }
 
 function cleanClientName(value) {
-  return cleanText(value).toLocaleUpperCase('pt-BR');
+  return normalizeClientName(cleanText(value));
 }
 
 function normalizeTechnicianName(value) {

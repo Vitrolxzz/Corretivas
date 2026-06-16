@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { defaultClientAliases, normalizeClientName } from './clientNames.js';
 import { closePool, databasePath, getDefaultYear, query } from './db.js';
 
 const schema = [
@@ -79,6 +80,16 @@ const schema = [
   )`,
   `CREATE INDEX IF NOT EXISTS client_name_idx
     ON clients (name COLLATE NOCASE)`,
+  `CREATE TABLE IF NOT EXISTS client_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alias TEXT NOT NULL DEFAULT '',
+    canonical_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (alias COLLATE NOCASE)
+  )`,
+  `CREATE INDEX IF NOT EXISTS client_alias_canonical_idx
+    ON client_aliases (canonical_name COLLATE NOCASE, alias COLLATE NOCASE)`,
   `CREATE TABLE IF NOT EXISTS technicians (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL DEFAULT '',
@@ -247,6 +258,13 @@ const schema = [
     BEGIN
       UPDATE clients SET updated_at = datetime('now') WHERE id = NEW.id;
     END`,
+  `CREATE TRIGGER IF NOT EXISTS client_alias_set_updated_at
+    AFTER UPDATE ON client_aliases
+    FOR EACH ROW
+    WHEN NEW.updated_at = OLD.updated_at
+    BEGIN
+      UPDATE client_aliases SET updated_at = datetime('now') WHERE id = NEW.id;
+    END`,
   `CREATE TRIGGER IF NOT EXISTS technician_set_updated_at
     AFTER UPDATE ON technicians
     FOR EACH ROW
@@ -261,7 +279,7 @@ function yearStart(year) {
 }
 
 function normalizeClientText(value) {
-  return String(value || '').trim().toLocaleUpperCase('pt-BR');
+  return normalizeClientName(value);
 }
 
 function normalizeTechnicianText(value) {
@@ -296,6 +314,18 @@ async function normalizeTextColumn(table, column, normalizer) {
     if (normalized && normalized !== row.value) {
       await query(`UPDATE ${table} SET ${column} = $2 WHERE id = $1`, [Number(row.id), normalized]);
     }
+  }
+}
+
+async function seedClientAliases() {
+  for (const entry of defaultClientAliases) {
+    await query(
+      `INSERT INTO client_aliases (alias, canonical_name)
+       VALUES ($1, $2)
+       ON CONFLICT (alias)
+       DO UPDATE SET canonical_name = EXCLUDED.canonical_name`,
+      [entry.alias, entry.canonicalName],
+    );
   }
 }
 
@@ -363,6 +393,7 @@ export async function migrate() {
     await query(statement);
   }
 
+  await seedClientAliases();
   await ensureColumn('turnstile_photos', 'original_size_bytes', 'INTEGER NOT NULL DEFAULT 0');
   await ensureColumn('turnstile_photos', 'optimized_width', 'INTEGER');
   await ensureColumn('turnstile_photos', 'optimized_height', 'INTEGER');

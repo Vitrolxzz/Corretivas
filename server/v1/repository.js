@@ -1,5 +1,6 @@
 import { query } from '../db.js';
 import { FieldValue, firestore } from '../firebase.js';
+import { normalizeClientName } from '../clientNames.js';
 
 const resources = {
   clientes: {
@@ -167,10 +168,6 @@ function normalizeDate(value) {
   const error = new Error('Data invalida. Use o formato AAAA-MM-DD, DD/MM/AAAA ou DD/MM.');
   error.status = 400;
   throw error;
-}
-
-function normalizeClientName(value) {
-  return String(value || '').trim().toLocaleUpperCase('pt-BR');
 }
 
 function normalizeTechnicianName(value) {
