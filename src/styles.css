@@ -1157,10 +1157,39 @@ tr:hover td.row-actions {
   cursor: pointer;
 }
 
+.notes-block {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.notes-block-title {
+  display: grid;
+  gap: 3px;
+}
+
+.notes-block-title strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.notes-block-title span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
+}
+
+.photo-card {
+  position: relative;
+  min-width: 0;
 }
 
 .photo-grid a {
@@ -1178,6 +1207,17 @@ tr:hover td.row-actions {
   border-radius: 8px;
   object-fit: cover;
   background: #0f1217;
+}
+
+.photo-card .icon-action {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 30px;
+  height: 30px;
+  background: rgba(15, 18, 23, 0.86);
+  color: var(--danger);
+  backdrop-filter: blur(8px);
 }
 
 .toast {

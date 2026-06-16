@@ -1246,6 +1246,34 @@ export default function App() {
     }
   }
 
+  async function deleteTurnstilePhoto(photoId) {
+    if (!window.confirm('Apagar esta imagem?')) {
+      return;
+    }
+
+    try {
+      await request(`/api/turnstiles/photos/${photoId}`, { method: 'DELETE' });
+      await Promise.all([loadTurnstilePhotos(editingTurnstileId), loadTurnstiles(), refreshOperationalData()]);
+      showToast('Imagem apagada.');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  }
+
+  async function deleteAppointmentPhoto(photoId) {
+    if (!window.confirm('Apagar esta imagem?')) {
+      return;
+    }
+
+    try {
+      await request(`/api/appointments/photos/${photoId}`, { method: 'DELETE' });
+      await Promise.all([loadAppointmentPhotos(editingAppointmentId), loadAppointments(), refreshOperationalData()]);
+      showToast('Imagem apagada.');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  }
+
   if (loading) {
     return (
       <main className="app-shell">
@@ -1530,13 +1558,17 @@ export default function App() {
                   onChange={(event) => updateAppointment('reportedProblem', event.target.value)}
                 />
               </Field>
-              <Field label="Observacoes">
+              <div className="notes-block">
+                <div className="notes-block-title">
+                  <strong>Anotacoes do agendamento</strong>
+                  <span>Informacoes importantes para a proxima visita</span>
+                </div>
                 <textarea
-                  rows="3"
+                  rows="4"
                   value={appointmentForm.notes}
                   onChange={(event) => updateAppointment('notes', event.target.value)}
                 />
-              </Field>
+              </div>
               <div className="form-grid two-fields">
                 <Field label="Data da visita">
                   <input
@@ -1607,10 +1639,15 @@ export default function App() {
                 </div>
                 <div className="photo-grid">
                   {appointmentPhotos.map((photo) => (
-                    <a key={photo.id} href={photoDownloadUrl(photo.id, 'appointments')} title="Baixar imagem">
-                      <img src={photoImageUrl(photo)} alt={photo.originalName || photo.fileName} />
-                      <span>{photo.originalName || photo.fileName}</span>
-                    </a>
+                    <div className="photo-card" key={photo.id}>
+                      <a href={photoDownloadUrl(photo.id, 'appointments')} title="Baixar imagem">
+                        <img src={photoImageUrl(photo)} alt={photo.originalName || photo.fileName} />
+                        <span>{photo.originalName || photo.fileName}</span>
+                      </a>
+                      <IconAction title="Apagar imagem" danger onClick={() => deleteAppointmentPhoto(photo.id)}>
+                        <Trash2 size={15} />
+                      </IconAction>
+                    </div>
                   ))}
                   {!appointmentPhotos.length && <EmptyState label="Nenhuma foto anexada." />}
                 </div>
@@ -2312,10 +2349,15 @@ export default function App() {
                 </div>
                 <div className="photo-grid">
                   {turnstilePhotos.map((photo) => (
-                    <a key={photo.id} href={photoDownloadUrl(photo.id)} title="Baixar imagem">
-                      <img src={photoImageUrl(photo)} alt={photo.originalName || photo.fileName} />
-                      <span>{photo.originalName || photo.fileName}</span>
-                    </a>
+                    <div className="photo-card" key={photo.id}>
+                      <a href={photoDownloadUrl(photo.id)} title="Baixar imagem">
+                        <img src={photoImageUrl(photo)} alt={photo.originalName || photo.fileName} />
+                        <span>{photo.originalName || photo.fileName}</span>
+                      </a>
+                      <IconAction title="Apagar imagem" danger onClick={() => deleteTurnstilePhoto(photo.id)}>
+                        <Trash2 size={15} />
+                      </IconAction>
+                    </div>
                   ))}
                   {!turnstilePhotos.length && <EmptyState label="Nenhuma foto anexada." />}
                 </div>

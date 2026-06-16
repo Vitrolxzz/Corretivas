@@ -1,5 +1,5 @@
 import express from 'express';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +20,7 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..', '..');
 const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(rootDir, 'data');
 const uploadDir = path.join(dataDir, 'uploads');
+const legacyUploadDir = path.join(rootDir, 'data', 'uploads');
 
 function requestOrigin(req) {
   const forwardedProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();
@@ -59,6 +60,57 @@ function photoRecordToJson(req, row, ownerKey) {
     uploadedBy: row.uploaded_by,
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
   };
+}
+
+function removeLocalStoredPhotoFile(storagePath) {
+  const text = String(storagePath || '').trim();
+
+  if (!text || text.startsWith('gs://')) {
+    return;
+  }
+
+  const filePath = path.resolve(text);
+  const allowedRoots = [uploadDir, legacyUploadDir].map((dir) => path.resolve(dir));
+  const isUploadFile = allowedRoots.some((dir) => filePath === dir || filePath.startsWith(`${dir}${path.sep}`));
+
+  if (!isUploadFile) {
+    return;
+  }
+
+  try {
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
+    }
+  } catch (error) {
+    logger.warn({ error: error.message, filePath }, 'Nao foi possivel apagar anexo local');
+  }
+}
+
+async function removeStoredPhotoFile(row) {
+  const publicPath = String(row?.public_path || '').trim();
+
+  if (publicPath.startsWith('gs://')) {
+    const bucket = firebaseStorageBucket();
+
+    if (!bucket) {
+      return;
+    }
+
+    const withoutScheme = publicPath.slice('gs://'.length);
+    const storagePath = withoutScheme.split('/').slice(1).join('/');
+
+    if (storagePath) {
+      try {
+        await bucket.file(storagePath).delete({ ignoreNotFound: true });
+      } catch (error) {
+        logger.warn({ error: error.message, storagePath }, 'Nao foi possivel apagar anexo do Firebase Storage');
+      }
+    }
+
+    return;
+  }
+
+  removeLocalStoredPhotoFile(row?.storage_path);
 }
 
 function todayText() {
@@ -676,6 +728,36 @@ export function createV1Router({ broadcast }) {
     }),
   );
 
+  router.delete(
+    '/catracas/:id/anexos/:photoId',
+    authGate(technicianWritableRoles),
+    asyncRoute(async (req, res) => {
+      const { rows } = await query(
+        `SELECT *
+         FROM turnstile_photos
+         WHERE id = $1 AND turnstile_id = $2`,
+        [Number(req.params.photoId), Number(req.params.id)],
+      );
+
+      if (!rows[0]) {
+        res.status(404).json({ error: 'Foto nao encontrada.' });
+        return;
+      }
+
+      await query('DELETE FROM turnstile_photos WHERE id = $1', [Number(req.params.photoId)]);
+      await removeStoredPhotoFile(rows[0]);
+      await auditLog({
+        user: req.user,
+        operation: 'delete',
+        resource: 'catracas/anexos',
+        recordId: req.params.photoId,
+        beforeValue: photoRecordToJson(req, rows[0], 'turnstile_id'),
+      });
+      broadcast({ version: 'v1', resource: 'catracas', action: 'photo-deleted', id: req.params.id, photoId: req.params.photoId });
+      res.status(204).end();
+    }),
+  );
+
   router.post(
     '/agendamentos/:id/anexos',
     authGate(technicianWritableRoles),
@@ -785,6 +867,36 @@ export function createV1Router({ broadcast }) {
       );
 
       res.json({ records: rows.map((row) => photoRecordToJson(req, row, 'appointment_id')) });
+    }),
+  );
+
+  router.delete(
+    '/agendamentos/:id/anexos/:photoId',
+    authGate(technicianWritableRoles),
+    asyncRoute(async (req, res) => {
+      const { rows } = await query(
+        `SELECT *
+         FROM appointment_photos
+         WHERE id = $1 AND appointment_id = $2`,
+        [Number(req.params.photoId), Number(req.params.id)],
+      );
+
+      if (!rows[0]) {
+        res.status(404).json({ error: 'Foto nao encontrada.' });
+        return;
+      }
+
+      await query('DELETE FROM appointment_photos WHERE id = $1', [Number(req.params.photoId)]);
+      await removeStoredPhotoFile(rows[0]);
+      await auditLog({
+        user: req.user,
+        operation: 'delete',
+        resource: 'agendamentos/anexos',
+        recordId: req.params.photoId,
+        beforeValue: photoRecordToJson(req, rows[0], 'appointment_id'),
+      });
+      broadcast({ version: 'v1', resource: 'agendamentos', action: 'photo-deleted', id: req.params.id, photoId: req.params.photoId });
+      res.status(204).end();
     }),
   );
 

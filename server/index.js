@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -130,6 +130,30 @@ function cleanText(value) {
   }
 
   return String(value).trim();
+}
+
+function removeStoredPhotoFile(storagePath) {
+  const text = cleanText(storagePath);
+
+  if (!text || text.startsWith('gs://')) {
+    return;
+  }
+
+  const filePath = path.resolve(text);
+  const allowedRoots = [uploadDir, legacyUploadDir].map((dir) => path.resolve(dir));
+  const isUploadFile = allowedRoots.some((dir) => filePath === dir || filePath.startsWith(`${dir}${path.sep}`));
+
+  if (!isUploadFile) {
+    return;
+  }
+
+  try {
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.warn(`Nao foi possivel apagar anexo ${filePath}: ${error.message}`);
+  }
 }
 
 function cleanClientName(value) {
@@ -1219,6 +1243,25 @@ app.get(
   }),
 );
 
+app.delete(
+  '/api/appointments/photos/:photoId',
+  asyncRoute(async (req, res) => {
+    const photoId = Number(req.params.photoId);
+    const { rows } = await query('SELECT * FROM appointment_photos WHERE id = $1', [photoId]);
+
+    if (!rows[0]) {
+      const error = new Error('Foto nao encontrada.');
+      error.status = 404;
+      throw error;
+    }
+
+    await query('DELETE FROM appointment_photos WHERE id = $1', [photoId]);
+    removeStoredPhotoFile(rows[0].storage_path);
+    broadcast({ table: 'appointment_photos', action: 'deleted', id: photoId, appointmentId: Number(rows[0].appointment_id) });
+    res.status(204).end();
+  }),
+);
+
 app.get(
   '/api/appointments/:id',
   asyncRoute(async (req, res) => {
@@ -1911,6 +1954,25 @@ app.get(
     }
 
     res.download(rows[0].storage_path, rows[0].original_name || rows[0].file_name);
+  }),
+);
+
+app.delete(
+  '/api/turnstiles/photos/:photoId',
+  asyncRoute(async (req, res) => {
+    const photoId = Number(req.params.photoId);
+    const { rows } = await query('SELECT * FROM turnstile_photos WHERE id = $1', [photoId]);
+
+    if (!rows[0]) {
+      const error = new Error('Foto nao encontrada.');
+      error.status = 404;
+      throw error;
+    }
+
+    await query('DELETE FROM turnstile_photos WHERE id = $1', [photoId]);
+    removeStoredPhotoFile(rows[0].storage_path);
+    broadcast({ table: 'turnstile_photos', action: 'deleted', id: photoId, turnstileId: Number(rows[0].turnstile_id) });
+    res.status(204).end();
   }),
 );
 

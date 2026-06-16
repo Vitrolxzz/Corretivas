@@ -1196,6 +1196,54 @@ class _ResourceEditorState extends State<ResourceEditor> {
     }
   }
 
+  Widget _buildEditorField(MapEntry<String, TextEditingController> entry) {
+    if (widget.resource == 'agendamentos' && entry.key == 'notes') {
+      return _AppointmentNotesEditor(controller: entry.value);
+    }
+
+    if (widget.resource == 'agendamentos' && entry.key == 'status') {
+      final raw = entry.value.text.trim();
+      final current = appointmentStatusOptions.contains(raw) ? raw : 'agendada';
+
+      if (entry.value.text != current) {
+        entry.value.text = current;
+      }
+
+      return DropdownButtonFormField<String>(
+        initialValue: current,
+        decoration: InputDecoration(labelText: fieldLabel(entry.key)),
+        items: appointmentStatusOptions
+            .map((status) =>
+                DropdownMenuItem(value: status, child: Text(status)))
+            .toList(),
+        onChanged: (value) {
+          if (value != null) {
+            entry.value.text = value;
+          }
+        },
+      );
+    }
+
+    return TextField(
+      controller: entry.value,
+      keyboardType: dateFieldKeys.contains(entry.key)
+          ? TextInputType.datetime
+          : numberFieldKeys.contains(entry.key)
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.text,
+      minLines: entry.key.toLowerCase().contains('notes') ||
+              entry.key.toLowerCase().contains('problem')
+          ? 2
+          : 1,
+      maxLines: 4,
+      decoration: InputDecoration(
+        labelText: fieldLabel(entry.key),
+        hintText:
+            dateFieldKeys.contains(entry.key) ? 'dd/mm/aaaa ou dd/mm' : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -1217,26 +1265,7 @@ class _ResourceEditorState extends State<ResourceEditor> {
             const SizedBox(height: 14),
             ..._controllers.entries.map((entry) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: TextField(
-                    controller: entry.value,
-                    keyboardType: dateFieldKeys.contains(entry.key)
-                        ? TextInputType.datetime
-                        : numberFieldKeys.contains(entry.key)
-                            ? const TextInputType.numberWithOptions(
-                                decimal: true)
-                            : TextInputType.text,
-                    minLines: entry.key.toLowerCase().contains('notes') ||
-                            entry.key.toLowerCase().contains('problem')
-                        ? 2
-                        : 1,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      labelText: fieldLabel(entry.key),
-                      hintText: dateFieldKeys.contains(entry.key)
-                          ? 'dd/mm/aaaa ou dd/mm'
-                          : null,
-                    ),
-                  ),
+                  child: _buildEditorField(entry),
                 )),
             FilledButton.icon(
                 onPressed: _save,
@@ -1244,6 +1273,46 @@ class _ResourceEditorState extends State<ResourceEditor> {
                 label: const Text('Salvar')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AppointmentNotesEditor extends StatelessWidget {
+  const _AppointmentNotesEditor({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: CorretivasTheme.panelSoft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: CorretivasTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Anotacoes do agendamento',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          const Text('Informacoes importantes para a proxima visita',
+              style: TextStyle(color: CorretivasTheme.muted, fontSize: 12)),
+          const SizedBox(height: 10),
+          TextField(
+            controller: controller,
+            minLines: 3,
+            maxLines: 6,
+            decoration: const InputDecoration(
+              hintText: 'Digite pecas pendentes, combinados e observacoes',
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1418,7 +1487,9 @@ class _ResourceDetailPageState extends State<ResourceDetailPage> {
         context: context,
         isScrollControlled: true,
         builder: (context) => _PhotoGallerySheet(
-          apiBaseUrl: widget.api.baseUrl,
+          api: widget.api,
+          resource: widget.resource,
+          recordId: _recordId,
           photos: photos,
         ),
       );
@@ -1548,11 +1619,31 @@ class _OpenImageField extends StatelessWidget {
   }
 }
 
-class _PhotoGallerySheet extends StatelessWidget {
-  const _PhotoGallerySheet({required this.apiBaseUrl, required this.photos});
+class _PhotoGallerySheet extends StatefulWidget {
+  const _PhotoGallerySheet({
+    required this.api,
+    required this.resource,
+    required this.recordId,
+    required this.photos,
+  });
 
-  final String apiBaseUrl;
+  final ApiClient api;
+  final String resource;
+  final String recordId;
   final List<Map<String, dynamic>> photos;
+
+  @override
+  State<_PhotoGallerySheet> createState() => _PhotoGallerySheetState();
+}
+
+class _PhotoGallerySheetState extends State<_PhotoGallerySheet> {
+  late final List<Map<String, dynamic>> _photos;
+
+  @override
+  void initState() {
+    super.initState();
+    _photos = List<Map<String, dynamic>>.from(widget.photos);
+  }
 
   String _resolveImageUrl(Object? value) {
     final raw = (value ?? '').toString().trim();
@@ -1571,9 +1662,9 @@ class _PhotoGallerySheet extends StatelessWidget {
       return raw;
     }
 
-    final base = apiBaseUrl.endsWith('/')
-        ? apiBaseUrl.substring(0, apiBaseUrl.length - 1)
-        : apiBaseUrl;
+    final base = widget.api.baseUrl.endsWith('/')
+        ? widget.api.baseUrl.substring(0, widget.api.baseUrl.length - 1)
+        : widget.api.baseUrl;
     return '$base$raw';
   }
 
@@ -1587,8 +1678,56 @@ class _PhotoGallerySheet extends StatelessWidget {
     return _resolveImageUrl(photo['publicUrl']);
   }
 
+  Future<void> _deletePhoto(Map<String, dynamic> photo) async {
+    final photoId = (photo['id'] ?? '').toString();
+
+    if (photoId.isEmpty) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Apagar imagem?'),
+        content: const Text('A imagem sera removida deste registro.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Apagar')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await widget.api.delete(
+          '/${widget.resource}/${Uri.encodeComponent(widget.recordId)}/anexos/${Uri.encodeComponent(photoId)}');
+
+      if (!mounted) return;
+
+      setState(() {
+        _photos.removeWhere((item) => (item['id'] ?? '').toString() == photoId);
+      });
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Imagem apagada.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Nao foi possivel apagar imagem: ${apiErrorMessage(error)}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final itemCount = _photos.isEmpty ? 2 : _photos.length + 1;
+
     return SafeArea(
       child: DraggableScrollableSheet(
         expand: false,
@@ -1598,7 +1737,7 @@ class _PhotoGallerySheet extends StatelessWidget {
         builder: (context, controller) => ListView.separated(
           controller: controller,
           padding: const EdgeInsets.all(14),
-          itemCount: photos.length + 1,
+          itemCount: itemCount,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             if (index == 0) {
@@ -1618,7 +1757,17 @@ class _PhotoGallerySheet extends StatelessWidget {
               );
             }
 
-            final photo = photos[index - 1];
+            if (_photos.isEmpty) {
+              return const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(18),
+                  child: Text('Nenhuma imagem anexada.',
+                      style: TextStyle(color: CorretivasTheme.muted)),
+                ),
+              );
+            }
+
+            final photo = _photos[index - 1];
             final imageUrl = _imageUrl(photo);
             final label = (photo['originalName'] ?? photo['fileName'] ?? '')
                 .toString()
@@ -1626,26 +1775,43 @@ class _PhotoGallerySheet extends StatelessWidget {
 
             return Card(
               clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(
-                        child: Text('Imagem indisponivel',
-                            style: TextStyle(color: CorretivasTheme.muted)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 4 / 3,
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Text('Imagem indisponivel',
+                                style: TextStyle(color: CorretivasTheme.muted)),
+                          ),
+                        ),
+                      ),
+                      if (label.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(label,
+                              maxLines: 2, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: IconButton(
+                      tooltip: 'Apagar imagem',
+                      onPressed: () => _deletePhoto(photo),
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      color: CorretivasTheme.danger,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black54,
                       ),
                     ),
                   ),
-                  if (label.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(label,
-                          maxLines: 2, overflow: TextOverflow.ellipsis),
-                    ),
                 ],
               ),
             );
@@ -1863,6 +2029,8 @@ const dateFieldKeys = {
 
 const numberFieldKeys = {'difficulty', 'visitValue', 'partsValue'};
 
+const appointmentStatusOptions = ['agendada', 'realizada', 'cancelada'];
+
 dynamic editorValue(String resource, String key, String value) {
   final text = value.trim();
   final nullableFields = {...dateFieldKeys, 'visitTime'};
@@ -1886,6 +2054,10 @@ dynamic editorValue(String resource, String key, String value) {
 
   if (dateFieldKeys.contains(key)) {
     return normalizeDateInput(text);
+  }
+
+  if (resource == 'agendamentos' && key == 'status') {
+    return appointmentStatusOptions.contains(text) ? text : 'agendada';
   }
 
   if (key == 'status' && text.isEmpty) {
