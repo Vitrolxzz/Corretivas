@@ -18,6 +18,7 @@ const rootDir = path.resolve(__dirname, '..');
 const distDir = path.join(rootDir, 'dist');
 const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(rootDir, 'data');
 const uploadDir = path.join(dataDir, 'uploads');
+const legacyUploadDir = path.join(rootDir, 'data', 'uploads');
 const apkDownloadUrl =
   process.env.APK_DOWNLOAD_URL || 'https://github.com/Vitrolxzz/Corretivas/releases/latest/download/Corretivas.apk';
 
@@ -72,6 +73,9 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '25mb' }));
 app.use('/api/uploads', express.static(uploadDir));
+if (legacyUploadDir !== uploadDir && existsSync(legacyUploadDir)) {
+  app.use('/api/uploads', express.static(legacyUploadDir));
+}
 
 app.get(['/Corretivas.apk', '/download/Corretivas.apk', '/downloads/Corretivas.apk'], (_req, res) => {
   res.redirect(302, apkDownloadUrl);
@@ -88,6 +92,36 @@ function basicHealthPayload() {
 
 function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+}
+
+function requestOrigin(req) {
+  const forwardedProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();
+  const forwardedHost = String(req.get('x-forwarded-host') || '').split(',')[0].trim();
+  const proto = forwardedProto || req.protocol || 'http';
+  const host = forwardedHost || req.get('host') || '';
+
+  return host ? `${proto}://${host}` : '';
+}
+
+function publicPhotoUrl(req, publicPath) {
+  const text = String(publicPath || '').trim();
+
+  if (!text || /^https?:\/\//i.test(text) || text.startsWith('gs://')) {
+    return text;
+  }
+
+  if (text.startsWith('/')) {
+    return `${requestOrigin(req)}${text}`;
+  }
+
+  return text;
+}
+
+function addPublicPhotoUrl(req, record) {
+  return {
+    ...record,
+    publicUrl: publicPhotoUrl(req, record.publicPath),
+  };
 }
 
 function cleanText(value) {
@@ -1329,7 +1363,7 @@ app.get(
       [Number(req.params.id)],
     );
 
-    res.json({ records: rows.map(appointmentPhotoToJson) });
+    res.json({ records: rows.map((row) => addPublicPhotoUrl(req, appointmentPhotoToJson(row))) });
   }),
 );
 
@@ -1403,7 +1437,7 @@ app.post(
     );
 
     broadcast({ table: 'appointment_photos', action: 'created', appointmentId });
-    res.status(201).json({ record: appointmentPhotoToJson(inserted.rows[0]) });
+    res.status(201).json({ record: addPublicPhotoUrl(req, appointmentPhotoToJson(inserted.rows[0])) });
   }),
 );
 
@@ -2006,7 +2040,7 @@ app.get(
       [Number(req.params.id)],
     );
 
-    res.json({ records: rows.map(turnstilePhotoToJson) });
+    res.json({ records: rows.map((row) => addPublicPhotoUrl(req, turnstilePhotoToJson(row))) });
   }),
 );
 
@@ -2080,7 +2114,7 @@ app.post(
     );
 
     broadcast({ table: 'turnstile_photos', action: 'created', turnstileId });
-    res.status(201).json({ record: turnstilePhotoToJson(inserted.rows[0]) });
+    res.status(201).json({ record: addPublicPhotoUrl(req, turnstilePhotoToJson(inserted.rows[0])) });
   }),
 );
 

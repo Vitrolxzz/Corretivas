@@ -1554,19 +1554,37 @@ class _PhotoGallerySheet extends StatelessWidget {
   final String apiBaseUrl;
   final List<Map<String, dynamic>> photos;
 
-  String _imageUrl(Map<String, dynamic> photo) {
-    final raw =
-        (photo['publicUrl'] ?? photo['publicPath'] ?? '').toString().trim();
+  String _resolveImageUrl(Object? value) {
+    final raw = (value ?? '').toString().trim();
 
-    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    if (raw.isEmpty || raw.startsWith('gs://')) {
+      return '';
+    }
+
+    if (raw.startsWith('http://') ||
+        raw.startsWith('https://') ||
+        raw.startsWith('data:')) {
       return raw;
     }
 
-    if (raw.startsWith('/')) {
-      return '$apiBaseUrl$raw';
+    if (!raw.startsWith('/')) {
+      return raw;
     }
 
-    return raw;
+    final base = apiBaseUrl.endsWith('/')
+        ? apiBaseUrl.substring(0, apiBaseUrl.length - 1)
+        : apiBaseUrl;
+    return '$base$raw';
+  }
+
+  String _imageUrl(Map<String, dynamic> photo) {
+    final publicPath = _resolveImageUrl(photo['publicPath']);
+
+    if (publicPath.isNotEmpty) {
+      return publicPath;
+    }
+
+    return _resolveImageUrl(photo['publicUrl']);
   }
 
   @override

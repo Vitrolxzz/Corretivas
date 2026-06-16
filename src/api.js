@@ -55,12 +55,24 @@ export function photoDownloadUrl(photoId, resource = 'turnstiles') {
   return `${apiBase}/api/${resource}/photos/${encodeURIComponent(photoId)}/download`;
 }
 
-export function photoImageUrl(photo) {
-  const path = String(photo?.publicUrl || photo?.publicPath || '').trim();
+function resolvePhotoUrl(value) {
+  const path = String(value || '').trim();
 
-  if (!path || path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+  if (!path || path.startsWith('gs://')) {
+    return '';
+  }
+
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
     return path;
   }
 
-  return path.startsWith('/') ? `${apiBase}${path}` : path;
+  if (path.startsWith('/')) {
+    return `${apiBase.replace(/\/$/, '')}${path}`;
+  }
+
+  return path;
+}
+
+export function photoImageUrl(photo) {
+  return resolvePhotoUrl(photo?.publicPath) || resolvePhotoUrl(photo?.publicUrl);
 }

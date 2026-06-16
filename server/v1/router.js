@@ -18,7 +18,8 @@ const readRoles = ['admin', 'operacional', 'tecnico', 'leitura'];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..', '..');
-const uploadDir = path.join(rootDir, 'data', 'uploads');
+const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(rootDir, 'data');
+const uploadDir = path.join(dataDir, 'uploads');
 
 function requestOrigin(req) {
   const forwardedProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();
