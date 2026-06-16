@@ -211,6 +211,16 @@ const schema = [
     context TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS system_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS system_notes_updated_idx
+    ON system_notes (updated_at DESC, id DESC)`,
   `CREATE TRIGGER IF NOT EXISTS periods_set_updated_at
     AFTER UPDATE ON periods
     FOR EACH ROW
@@ -273,6 +283,13 @@ const schema = [
     WHEN NEW.updated_at = OLD.updated_at
     BEGIN
       UPDATE technicians SET updated_at = datetime('now') WHERE id = NEW.id;
+    END`,
+  `CREATE TRIGGER IF NOT EXISTS system_notes_set_updated_at
+    AFTER UPDATE ON system_notes
+    FOR EACH ROW
+    WHEN NEW.updated_at = OLD.updated_at
+    BEGIN
+      UPDATE system_notes SET updated_at = datetime('now') WHERE id = NEW.id;
     END`,
 ];
 

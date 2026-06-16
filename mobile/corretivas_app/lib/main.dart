@@ -279,6 +279,12 @@ class _HomePageState extends State<HomePage> {
           refreshKey: _refreshKey),
       ResourcePage(
           api: widget.api,
+          title: 'Anotacoes',
+          resource: 'anotacoes',
+          icon: Icons.note_alt_rounded,
+          refreshKey: _refreshKey),
+      ResourcePage(
+          api: widget.api,
           title: 'Clientes',
           resource: 'clientes',
           icon: Icons.people_rounded,
@@ -373,6 +379,8 @@ class _HomePageState extends State<HomePage> {
               icon: Icon(Icons.checklist_rounded), label: Text('Comandas')),
           NavigationDrawerDestination(
               icon: Icon(Icons.build_rounded), label: Text('Catracas')),
+          NavigationDrawerDestination(
+              icon: Icon(Icons.note_alt_rounded), label: Text('Anotacoes')),
           NavigationDrawerDestination(
               icon: Icon(Icons.people_rounded), label: Text('Clientes')),
           NavigationDrawerDestination(
@@ -1128,6 +1136,7 @@ class _ResourcePageState extends State<ResourcePage> {
   final _search = TextEditingController();
   List<Map<String, dynamic>> _records = [];
   String _visitTypeFilter = '';
+  Map<String, dynamic>? _visitTypeSummary;
   bool _loading = true;
   String? _error;
 
@@ -1165,9 +1174,15 @@ class _ResourcePageState extends State<ResourcePage> {
       final data = await widget.api.get('/${widget.resource}$query');
       final records = (data['records'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>();
+      final summary = data['visitTypeSummary'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(data['visitTypeSummary'])
+          : null;
 
       if (!mounted) return;
-      setState(() => _records = records);
+      setState(() {
+        _records = records;
+        _visitTypeSummary = widget.resource == 'agendamentos' ? summary : null;
+      });
     } catch (error) {
       setState(() => _error = error.toString());
     } finally {
@@ -1329,6 +1344,8 @@ class _ResourcePageState extends State<ResourcePage> {
               },
             ),
           ],
+          if (widget.resource == 'agendamentos' && _visitTypeSummary != null)
+            _VisitTypeSummary(summary: _visitTypeSummary!),
           if (_loading)
             const Padding(
                 padding: EdgeInsets.all(28),
@@ -1406,6 +1423,11 @@ class _ResourceEditorState extends State<ResourceEditor> {
       for (final entry in _controllers.entries)
         entry.key: editorValue(widget.resource, entry.key, entry.value.text)
     };
+
+    if (widget.resource == 'anotacoes' &&
+        (body['createdBy']?.toString().trim().isEmpty ?? true)) {
+      body['createdBy'] = widget.api.operatorName;
+    }
 
     try {
       if (widget.record == null) {
@@ -1535,6 +1557,85 @@ class _ResourceEditorState extends State<ResourceEditor> {
                 label: const Text('Salvar')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VisitTypeSummary extends StatelessWidget {
+  const _VisitTypeSummary({required this.summary});
+
+  final Map<String, dynamic> summary;
+
+  int _toInt(dynamic value) {
+    if (value is num) return value.round();
+    return num.tryParse(value?.toString() ?? '')?.round() ?? 0;
+  }
+
+  int _value(String group, String key) {
+    final data = summary[group];
+    if (data is Map<String, dynamic>) {
+      return _toInt(data[key]);
+    }
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = _toInt(summary['total']);
+    final garantiaTotal = _value('garantia', 'total');
+    final garantiaAverage = _value('garantia', 'average');
+    final retornoTotal = _value('retorno', 'total');
+    final retornoAverage = _value('retorno', 'average');
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _SmallSummaryCard(label: 'Total geral', value: total.toString()),
+          _SmallSummaryCard(
+              label: 'Garantia',
+              value: '$garantiaTotal (${garantiaAverage.toString()}%)'),
+          _SmallSummaryCard(
+              label: 'Retorno',
+              value: '$retornoTotal (${retornoAverage.toString()}%)'),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallSummaryCard extends StatelessWidget {
+  const _SmallSummaryCard({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 116,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: CorretivasTheme.panelSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CorretivasTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(color: CorretivasTheme.muted, fontSize: 12)),
+        ],
       ),
     );
   }
@@ -2074,6 +2175,7 @@ class _DetailField extends StatelessWidget {
 String recordTitle(Map<String, dynamic> record) {
   return (record['clientName'] ??
           record['client'] ??
+          record['title'] ??
           record['name'] ??
           record['bakery'] ??
           record['model'] ??
@@ -2282,6 +2384,10 @@ List<String> editorFields(String resource) {
         'notes',
         'status'
       ],
+    'anotacoes' => [
+        'title',
+        'content',
+      ],
     _ => ['name', 'notes'],
   };
 }
@@ -2392,6 +2498,8 @@ String fieldLabel(String key) {
   const labels = {
     'id': 'ID',
     'periodId': 'Periodo',
+    'title': 'Titulo',
+    'content': 'Anotacao',
     'name': 'Nome',
     'address': 'Endereco',
     'contact': 'Contato',
@@ -2429,6 +2537,7 @@ String fieldLabel(String key) {
     'expectedDeliveryDate': 'Entrega prevista',
     'createdAt': 'Criado em',
     'updatedAt': 'Atualizado em',
+    'createdBy': 'Criado por',
     'userName': 'Usuario',
     'userEmail': 'Identificacao',
     'operation': 'Operacao',

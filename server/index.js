@@ -532,6 +532,17 @@ function turnstileToJson(row) {
   };
 }
 
+function systemNoteToJson(row) {
+  return {
+    id: Number(row.id),
+    title: row.title,
+    content: row.content,
+    createdBy: row.created_by,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+  };
+}
+
 function turnstilePhotoToJson(row) {
   return {
     id: Number(row.id),
@@ -627,6 +638,42 @@ function turnstilePayload(body) {
     expectedDeliveryDate: cleanDate(body.expectedDeliveryDate),
     notes: cleanText(body.notes),
     status: cleanTurnstileStatus(body.status),
+  };
+}
+
+function systemNotePayload(body) {
+  const title = cleanText(body.title);
+  const content = cleanText(body.content);
+
+  if (!title && !content) {
+    const error = new Error('Informe um titulo ou uma anotacao.');
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    title,
+    content,
+    createdBy: cleanText(body.createdBy) || 'Sistema web',
+  };
+}
+
+function appointmentVisitTypeSummaryFromRow(row) {
+  const total = Number(row?.total || 0);
+  const garantia = Number(row?.garantia || 0);
+  const retorno = Number(row?.retorno || 0);
+  const average = (value) => (total ? Math.round((Number(value || 0) / total) * 100) : 0);
+
+  return {
+    total,
+    garantia: {
+      total: garantia,
+      average: average(garantia),
+    },
+    retorno: {
+      total: retorno,
+      average: average(retorno),
+    },
   };
 }
 
@@ -1193,52 +1240,168 @@ app.get(
 );
 
 app.get(
+  '/api/notes',
+  asyncRoute(async (req, res) => {
+    const params = [];
+    const whereParts = [];
+    const search = cleanText(req.query.search);
+
+    if (search) {
+      params.push(likeParam(search));
+      whereParts.push(`(
+        title LIKE $${params.length} COLLATE NOCASE
+        OR content LIKE $${params.length} COLLATE NOCASE
+        OR created_by LIKE $${params.length} COLLATE NOCASE
+      )`);
+    }
+
+    const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const { rows } = await query(
+      `SELECT *
+       FROM system_notes
+       ${where}
+       ORDER BY updated_at DESC, id DESC
+       LIMIT 200`,
+      params,
+    );
+
+    res.json({ records: rows.map(systemNoteToJson) });
+  }),
+);
+
+app.post(
+  '/api/notes',
+  asyncRoute(async (req, res) => {
+    const payload = systemNotePayload(req.body || {});
+    const { rows } = await query(
+      `INSERT INTO system_notes (title, content, created_by)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [payload.title, payload.content, payload.createdBy],
+    );
+    const record = systemNoteToJson(rows[0]);
+    broadcast({ table: 'system_notes', action: 'created', id: record.id });
+    res.status(201).json({ record });
+  }),
+);
+
+app.get(
+  '/api/notes/:id',
+  asyncRoute(async (req, res) => {
+    const { rows } = await query('SELECT * FROM system_notes WHERE id = $1', [Number(req.params.id)]);
+
+    if (!rows[0]) {
+      const error = new Error('Anotacao nao encontrada.');
+      error.status = 404;
+      throw error;
+    }
+
+    res.json({ record: systemNoteToJson(rows[0]) });
+  }),
+);
+
+app.put(
+  '/api/notes/:id',
+  asyncRoute(async (req, res) => {
+    const current = await query('SELECT * FROM system_notes WHERE id = $1', [Number(req.params.id)]);
+
+    if (!current.rows[0]) {
+      const error = new Error('Anotacao nao encontrada.');
+      error.status = 404;
+      throw error;
+    }
+
+    const payload = systemNotePayload({
+      ...(req.body || {}),
+      createdBy: cleanText(req.body?.createdBy) || current.rows[0].created_by,
+    });
+    const { rows } = await query(
+      `UPDATE system_notes
+       SET title = $2,
+           content = $3,
+           created_by = $4
+       WHERE id = $1
+       RETURNING *`,
+      [Number(req.params.id), payload.title, payload.content, payload.createdBy],
+    );
+
+    const record = systemNoteToJson(rows[0]);
+    broadcast({ table: 'system_notes', action: 'updated', id: record.id });
+    res.json({ record });
+  }),
+);
+
+app.delete(
+  '/api/notes/:id',
+  asyncRoute(async (req, res) => {
+    await query('DELETE FROM system_notes WHERE id = $1', [Number(req.params.id)]);
+    broadcast({ table: 'system_notes', action: 'deleted', id: Number(req.params.id) });
+    res.status(204).end();
+  }),
+);
+
+app.get(
   '/api/appointments',
   asyncRoute(async (req, res) => {
     const page = pageFromQuery(req.query.page);
     const limit = limitFromQuery(req.query.limit);
     const offset = (page - 1) * limit;
-    const params = [];
-    const whereParts = [];
+    const baseParams = [];
+    const baseWhereParts = [];
     const search = cleanText(req.query.search);
     const technician = cleanText(req.query.technician);
     const visitType = cleanAppointmentVisitType(req.query.visitType);
     const { startDate, endDate } = dateFiltersFromQuery(req.query);
 
     if (search) {
-      params.push(likeParam(search));
-      whereParts.push(`(
-        client_name LIKE $${params.length} COLLATE NOCASE
-        OR address LIKE $${params.length} COLLATE NOCASE
-        OR reported_problem LIKE $${params.length} COLLATE NOCASE
-        OR notes LIKE $${params.length} COLLATE NOCASE
-        OR annotations LIKE $${params.length} COLLATE NOCASE
-        OR technician LIKE $${params.length} COLLATE NOCASE
+      baseParams.push(likeParam(search));
+      baseWhereParts.push(`(
+        client_name LIKE $${baseParams.length} COLLATE NOCASE
+        OR address LIKE $${baseParams.length} COLLATE NOCASE
+        OR reported_problem LIKE $${baseParams.length} COLLATE NOCASE
+        OR notes LIKE $${baseParams.length} COLLATE NOCASE
+        OR annotations LIKE $${baseParams.length} COLLATE NOCASE
+        OR technician LIKE $${baseParams.length} COLLATE NOCASE
       )`);
     }
 
     if (technician) {
-      params.push(technician);
-      whereParts.push(`technician = $${params.length} COLLATE NOCASE`);
+      baseParams.push(technician);
+      baseWhereParts.push(`technician = $${baseParams.length} COLLATE NOCASE`);
     }
+
+    if (startDate) {
+      baseParams.push(startDate);
+      baseWhereParts.push(`visit_date >= $${baseParams.length}`);
+    }
+
+    if (endDate) {
+      baseParams.push(endDate);
+      baseWhereParts.push(`visit_date <= $${baseParams.length}`);
+    }
+
+    const params = [...baseParams];
+    const whereParts = [...baseWhereParts];
 
     if (visitType) {
       params.push(visitType);
       whereParts.push(`visit_type = $${params.length}`);
     }
 
-    if (startDate) {
-      params.push(startDate);
-      whereParts.push(`visit_date >= $${params.length}`);
-    }
-
-    if (endDate) {
-      params.push(endDate);
-      whereParts.push(`visit_date <= $${params.length}`);
-    }
-
+    const baseWhere = baseWhereParts.length ? baseWhereParts.join(' AND ') : '1 = 1';
     const where = whereParts.length ? whereParts.join(' AND ') : '1 = 1';
-    const total = await query(`SELECT COUNT(*) AS total FROM appointments WHERE ${where}`, params);
+    const [total, typeSummary] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM appointments WHERE ${where}`, params),
+      query(
+        `SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN visit_type = 'garantia' THEN 1 ELSE 0 END) AS garantia,
+          SUM(CASE WHEN visit_type = 'retorno' THEN 1 ELSE 0 END) AS retorno
+         FROM appointments
+         WHERE ${baseWhere}`,
+        baseParams,
+      ),
+    ]);
     const rows = await query(
       `SELECT appointments.*, (
         SELECT COUNT(*)
@@ -1262,6 +1425,7 @@ app.get(
     res.json({
       records: rows.rows.map(appointmentToJson),
       total: Number(total.rows[0].total || 0),
+      visitTypeSummary: appointmentVisitTypeSummaryFromRow(typeSummary.rows[0]),
       page,
       limit,
     });
@@ -2295,7 +2459,7 @@ app.get(
     }
 
     const like = likeParam(search);
-    const [clients, correctives, commands, appointments, turnstiles] = await Promise.all([
+    const [clients, correctives, commands, appointments, turnstiles, notes] = await Promise.all([
       query(
         `SELECT name
          FROM (
@@ -2356,6 +2520,16 @@ app.get(
          LIMIT 8`,
         [like],
       ),
+      query(
+        `SELECT id, title, content, created_by
+         FROM system_notes
+         WHERE title LIKE $1 COLLATE NOCASE
+            OR content LIKE $1 COLLATE NOCASE
+            OR created_by LIKE $1 COLLATE NOCASE
+         ORDER BY updated_at DESC, id DESC
+         LIMIT 8`,
+        [like],
+      ),
     ]);
 
     const groups = [
@@ -2405,6 +2579,15 @@ app.get(
           id: Number(row.id),
           label: row.client_name || `Catraca #${row.id}`,
           description: `${row.model || 'Sem modelo'} - ${row.status} - ${dateToJson(row.expected_delivery_date) || '-'}`,
+        })),
+      },
+      {
+        category: 'Anotacoes',
+        type: 'note',
+        items: notes.rows.map((row) => ({
+          id: Number(row.id),
+          label: row.title || `Anotacao #${row.id}`,
+          description: [row.content, row.created_by].filter(Boolean).join(' | ') || 'Anotacao do sistema',
         })),
       },
     ].filter((group) => group.items.length);

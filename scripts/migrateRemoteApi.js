@@ -94,6 +94,15 @@ const resources = [
       status: 'status',
     },
   },
+  {
+    resource: 'anotacoes',
+    table: 'system_notes',
+    fields: {
+      title: 'title',
+      content: 'content',
+      created_by: 'createdBy',
+    },
+  },
 ];
 
 function parseArgs(args) {

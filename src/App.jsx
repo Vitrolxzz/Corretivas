@@ -41,6 +41,7 @@ const tabs = [
   { id: 'correctives', label: 'Ocorrencias', icon: ClipboardList },
   { id: 'commands', label: 'Cadastro de Comandas', icon: ListChecks },
   { id: 'turnstiles', label: 'Catracas para Montagem', icon: Wrench },
+  { id: 'notes', label: 'Anotacoes', icon: FileText },
 ];
 
 const healthOptions = ['Ok', 'Nulo'];
@@ -118,6 +119,11 @@ const emptyTurnstile = {
   expectedDeliveryDate: '',
   notes: '',
   status: 'Aguardando montagem',
+};
+
+const emptySystemNote = {
+  title: '',
+  content: '',
 };
 
 function formatDate(value) {
@@ -573,6 +579,7 @@ export default function App() {
   const [editingAppointmentId, setEditingAppointmentId] = useState(null);
   const [appointmentsMode, setAppointmentsMode] = useState('list');
   const [appointmentPhotos, setAppointmentPhotos] = useState([]);
+  const [appointmentVisitTypeSummary, setAppointmentVisitTypeSummary] = useState(null);
 
   const [turnstiles, setTurnstiles] = useState([]);
   const [turnstilesTotal, setTurnstilesTotal] = useState(0);
@@ -584,6 +591,11 @@ export default function App() {
   const [editingTurnstileId, setEditingTurnstileId] = useState(null);
   const [turnstilesMode, setTurnstilesMode] = useState('kanban');
   const [turnstilePhotos, setTurnstilePhotos] = useState([]);
+
+  const [systemNotes, setSystemNotes] = useState([]);
+  const [systemNotesSearch, setSystemNotesSearch] = useState('');
+  const [systemNoteForm, setSystemNoteForm] = useState(emptySystemNote);
+  const [editingSystemNoteId, setEditingSystemNoteId] = useState(null);
 
   const [technicians, setTechnicians] = useState([]);
   const [technicianStartDate, setTechnicianStartDate] = useState('');
@@ -759,6 +771,7 @@ export default function App() {
     const data = await request(`/api/appointments?${params}`);
     setAppointments(data.records);
     setAppointmentsTotal(data.total);
+    setAppointmentVisitTypeSummary(data.visitTypeSummary || null);
   }, [appointmentsPage, appointmentsSearch, appointmentsTechnician, appointmentsVisitType, appointmentsStartDate, appointmentsEndDate]);
 
   const loadAppointmentPhotos = useCallback(async (id) => {
@@ -770,6 +783,18 @@ export default function App() {
     const data = await request(`/api/appointments/${id}/photos`);
     setAppointmentPhotos(data.records);
   }, []);
+
+  const loadSystemNotes = useCallback(async () => {
+    const params = new URLSearchParams();
+
+    if (systemNotesSearch.trim()) {
+      params.set('search', systemNotesSearch.trim());
+    }
+
+    const suffix = params.toString() ? `?${params}` : '';
+    const data = await request(`/api/notes${suffix}`);
+    setSystemNotes(data.records);
+  }, [systemNotesSearch]);
 
   const loadTurnstiles = useCallback(async () => {
     const params = new URLSearchParams({ limit: '200' });
@@ -859,6 +884,7 @@ export default function App() {
       loadCommands(),
       loadAppointments(),
       loadTurnstiles(),
+      loadSystemNotes(),
       loadTechnicians(),
       loadDailyReport(),
       loadMonthlyReport(),
@@ -874,6 +900,7 @@ export default function App() {
     loadCommands,
     loadAppointments,
     loadTurnstiles,
+    loadSystemNotes,
     loadTechnicians,
     loadDailyReport,
     loadMonthlyReport,
@@ -924,6 +951,10 @@ export default function App() {
   function updateTurnstile(field, value) {
     const normalizedValue = field === 'clientName' ? normalizeClientInput(value) : value;
     setTurnstileForm((current) => ({ ...current, [field]: normalizedValue }));
+  }
+
+  function updateSystemNote(field, value) {
+    setSystemNoteForm((current) => ({ ...current, [field]: value }));
   }
 
   async function refreshOperationalData() {
@@ -1034,6 +1065,22 @@ export default function App() {
       setEditingTurnstileId(id);
       await Promise.all([loadTurnstiles(), refreshOperationalData(), loadTurnstilePhotos(id)]);
       showToast(editingTurnstileId ? 'Catraca atualizada.' : 'Catraca cadastrada.');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  }
+
+  async function saveSystemNote(event) {
+    event.preventDefault();
+    const method = editingSystemNoteId ? 'PUT' : 'POST';
+    const path = editingSystemNoteId ? `/api/notes/${editingSystemNoteId}` : '/api/notes';
+
+    try {
+      await request(path, { method, body: systemNoteForm });
+      setSystemNoteForm(emptySystemNote);
+      setEditingSystemNoteId(null);
+      await loadSystemNotes();
+      showToast(editingSystemNoteId ? 'Anotacao atualizada.' : 'Anotacao criada.');
     } catch (error) {
       showToast(error.message, 'error');
     }
@@ -1173,6 +1220,18 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function editSystemNote(record) {
+    setEditingSystemNoteId(record.id);
+    setSystemNoteForm(
+      normalizeForForm({
+        title: record.title,
+        content: record.content,
+      }),
+    );
+    setActiveTab('notes');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   async function openClientHistory(name) {
     try {
       const data = await request(`/api/clients/history?name=${encodeURIComponent(name)}`);
@@ -1235,6 +1294,12 @@ export default function App() {
       if (item.type === 'turnstile') {
         const data = await request(`/api/turnstiles/${item.id}`);
         editTurnstile(data.record);
+        return;
+      }
+
+      if (item.type === 'note') {
+        const data = await request(`/api/notes/${item.id}`);
+        editSystemNote(data.record);
       }
     } catch (error) {
       showToast(error.message, 'error');
@@ -1837,6 +1902,22 @@ export default function App() {
               <span className="counter">{appointmentsTotal} registros</span>
             </div>
 
+            {appointmentVisitTypeSummary && (
+              <div className="report-summary compact-summary">
+                <StatTile icon={CalendarDays} label="Total geral de visitas" value={appointmentVisitTypeSummary.total} />
+                <StatTile
+                  icon={ShieldCheck}
+                  label="Garantia sobre o total"
+                  value={`${appointmentVisitTypeSummary.garantia?.total || 0} (${appointmentVisitTypeSummary.garantia?.average || 0}%)`}
+                />
+                <StatTile
+                  icon={RefreshCw}
+                  label="Retorno sobre o total"
+                  value={`${appointmentVisitTypeSummary.retorno?.total || 0} (${appointmentVisitTypeSummary.retorno?.average || 0}%)`}
+                />
+              </div>
+            )}
+
             {appointmentsMode === 'calendar' ? (
               <div className="calendar-panel">
                 <Suspense
@@ -2430,6 +2511,98 @@ export default function App() {
                 </tbody>
               </table>
               {!commands.length && <EmptyState label="Nenhuma comanda encontrada." />}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'notes' && (
+        <section className="workspace two-column">
+          <form className="entry-panel compact-panel" onSubmit={saveSystemNote}>
+            <div className="section-title">
+              <h2>{editingSystemNoteId ? 'Editar anotacao' : 'Nova anotacao'}</h2>
+              {editingSystemNoteId && (
+                <IconAction
+                  title="Cancelar edicao"
+                  onClick={() => {
+                    setEditingSystemNoteId(null);
+                    setSystemNoteForm(emptySystemNote);
+                  }}
+                >
+                  <X size={18} />
+                </IconAction>
+              )}
+            </div>
+            <div className="form-grid single-column">
+              <Field label="Titulo">
+                <input value={systemNoteForm.title} onChange={(event) => updateSystemNote('title', event.target.value)} />
+              </Field>
+              <Field label="Anotacao">
+                <textarea
+                  rows="8"
+                  value={systemNoteForm.content}
+                  onChange={(event) => updateSystemNote('content', event.target.value)}
+                />
+              </Field>
+            </div>
+            <div className="form-actions">
+              <button className="primary-button" type="submit">
+                <Save size={18} />
+                {editingSystemNoteId ? 'Salvar edicao' : 'Salvar anotacao'}
+              </button>
+            </div>
+          </form>
+
+          <div className="list-panel">
+            <div className="section-title">
+              <h2>Anotacoes importantes</h2>
+            </div>
+            <div className="toolbar">
+              <div className="search-box">
+                <Search size={17} />
+                <input
+                  placeholder="Buscar anotacao"
+                  value={systemNotesSearch}
+                  onChange={(event) => setSystemNotesSearch(event.target.value)}
+                />
+              </div>
+              <span className="counter">{systemNotes.length} registros</span>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Titulo</th>
+                    <th>Anotacao</th>
+                    <th>Criado por</th>
+                    <th>Atualizado</th>
+                    <th className="actions-heading">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {systemNotes.map((record) => (
+                    <tr key={record.id}>
+                      <td>{record.title || '-'}</td>
+                      <td className="long-cell">{record.content || '-'}</td>
+                      <td>{record.createdBy || '-'}</td>
+                      <td>{record.updatedAt ? new Date(record.updatedAt).toLocaleString('pt-BR') : '-'}</td>
+                      <td className="row-actions">
+                        <IconAction title="Editar" onClick={() => editSystemNote(record)}>
+                          <Edit3 size={17} />
+                        </IconAction>
+                        <IconAction
+                          title="Excluir"
+                          danger
+                          onClick={() => deleteRecord(`/api/notes/${record.id}`, loadSystemNotes, 'anotacao')}
+                        >
+                          <Trash2 size={17} />
+                        </IconAction>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!systemNotes.length && <EmptyState label="Nenhuma anotacao cadastrada." />}
             </div>
           </div>
         </section>

@@ -98,6 +98,15 @@ const resources = {
       status: 'status',
     },
   },
+  anotacoes: {
+    table: 'system_notes',
+    collection: 'anotacoes',
+    fields: {
+      title: 'title',
+      content: 'content',
+      createdBy: 'created_by',
+    },
+  },
   auditoria: {
     table: 'audit_logs',
     collection: 'auditoria',
@@ -223,6 +232,17 @@ function normalizePayload(body, config) {
     normalized.visitType = normalizeAppointmentVisitType(normalized.visitType);
   }
 
+  if (config.table === 'system_notes') {
+    const title = String(normalized.title || '').trim();
+    const content = String(normalized.content || '').trim();
+
+    if (!title && !content) {
+      const error = new Error('Informe um titulo ou uma anotacao.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
   return normalized;
 }
 
@@ -333,8 +353,54 @@ export async function listRecords(resource, options = {}) {
     return rows.map((row) => toApi(row, config));
   }
 
+  if (resource === 'anotacoes') {
+    const { rows } = await query(
+      `SELECT *
+       FROM system_notes
+       ORDER BY updated_at DESC, id DESC
+       LIMIT $1`,
+      [limit],
+    );
+    return rows.map((row) => toApi(row, config));
+  }
+
   const { rows } = await query(`SELECT * FROM ${config.table} ORDER BY id DESC LIMIT $1`, [limit]);
   return rows.map((row) => toApi(row, config));
+}
+
+export async function appointmentVisitTypeSummary() {
+  if (backend() === 'firebase') {
+    const snapshot = await firestore().collection('agendamentos').get();
+    const rows = snapshot.docs.map((doc) => doc.data());
+    const total = rows.length;
+    const garantia = rows.filter((row) => row.visitType === 'garantia').length;
+    const retorno = rows.filter((row) => row.visitType === 'retorno').length;
+    const average = (value) => (total ? Math.round((Number(value || 0) / total) * 100) : 0);
+
+    return {
+      total,
+      garantia: { total: garantia, average: average(garantia) },
+      retorno: { total: retorno, average: average(retorno) },
+    };
+  }
+
+  const { rows } = await query(
+    `SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN visit_type = 'garantia' THEN 1 ELSE 0 END) AS garantia,
+      SUM(CASE WHEN visit_type = 'retorno' THEN 1 ELSE 0 END) AS retorno
+     FROM appointments`,
+  );
+  const total = Number(rows[0]?.total || 0);
+  const garantia = Number(rows[0]?.garantia || 0);
+  const retorno = Number(rows[0]?.retorno || 0);
+  const average = (value) => (total ? Math.round((Number(value || 0) / total) * 100) : 0);
+
+  return {
+    total,
+    garantia: { total: garantia, average: average(garantia) },
+    retorno: { total: retorno, average: average(retorno) },
+  };
 }
 
 export async function getRecord(resource, id) {

@@ -10,7 +10,7 @@ import { query } from '../db.js';
 import { firebaseAuth, firebaseConfigured, firebaseMessaging, firebaseStorageBucket } from '../firebase.js';
 import { logger } from '../logger.js';
 import { buildAppointmentScheduledNotification, sendAppointmentScheduledNotification } from '../notifications.js';
-import { auditLog, createRecord, deleteRecord, getRecord, listRecords, updateRecord } from './repository.js';
+import { appointmentVisitTypeSummary, auditLog, createRecord, deleteRecord, getRecord, listRecords, updateRecord } from './repository.js';
 import { requireAuth, signApiToken, validateLocalPassword } from './security.js';
 
 const writableRoles = ['admin', 'operacional'];
@@ -1081,7 +1081,7 @@ export function createV1Router({ broadcast }) {
     }),
   );
 
-  const domains = ['clientes', 'ocorrencias', 'agendamentos', 'comandas', 'catracas', 'tecnicos', 'auditoria', 'logs'];
+  const domains = ['clientes', 'ocorrencias', 'agendamentos', 'comandas', 'catracas', 'anotacoes', 'tecnicos', 'auditoria', 'logs'];
 
   for (const domain of domains) {
     const writeRoles = domain === 'ocorrencias' || domain === 'agendamentos' || domain === 'catracas'
@@ -1093,7 +1093,13 @@ export function createV1Router({ broadcast }) {
       authGate(readRoles),
       asyncRoute(async (req, res) => {
         const records = await listRecords(domain, req.query);
-        res.json({ records });
+        const payload = { records };
+
+        if (domain === 'agendamentos') {
+          payload.visitTypeSummary = await appointmentVisitTypeSummary();
+        }
+
+        res.json(payload);
       }),
     );
 
@@ -1116,7 +1122,13 @@ export function createV1Router({ broadcast }) {
       `/${domain}`,
       authGate(writeRoles),
       asyncRoute(async (req, res) => {
-        const record = await createRecord(domain, req.body || {});
+        const body = { ...(req.body || {}) };
+
+        if (domain === 'anotacoes' && !body.createdBy) {
+          body.createdBy = req.user?.name || req.user?.email || '';
+        }
+
+        const record = await createRecord(domain, body);
         await auditLog({ user: req.user, operation: 'create', resource: domain, recordId: record.id, afterValue: record });
         const event = { version: 'v1', resource: domain, action: 'created', id: record.id };
 
