@@ -1214,7 +1214,7 @@ app.get(
       ) AS photo_count
        FROM appointments
        WHERE ${where}
-       ORDER BY COALESCE(visit_date, '9999-12-31') ASC, COALESCE(visit_time, '') ASC, id DESC
+       ORDER BY COALESCE(visit_date, '0001-01-01') DESC, COALESCE(visit_time, '') DESC, id DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset],
     );
