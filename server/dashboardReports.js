@@ -12,7 +12,10 @@ const reportDefinitions = {
       ['Horario', 'time'],
       ['Tecnico', 'technician'],
       ['Status', 'status'],
+      ['Tipo visita', 'visitType'],
       ['Problema', 'details'],
+      ['Observacoes', 'notes'],
+      ['Anotacoes', 'annotations'],
     ],
   },
   upcomingAppointments: {
@@ -24,7 +27,10 @@ const reportDefinitions = {
       ['Horario', 'time'],
       ['Tecnico', 'technician'],
       ['Status', 'status'],
+      ['Tipo visita', 'visitType'],
       ['Problema', 'details'],
+      ['Observacoes', 'notes'],
+      ['Anotacoes', 'annotations'],
     ],
   },
   openCorrectives: {
@@ -225,7 +231,8 @@ export async function buildDashboardReport(metric, options = {}) {
   if (metric === 'todayAppointments') {
     total = await count(`SELECT COUNT(*) AS total FROM appointments WHERE visit_date = $1 AND status <> 'cancelada'`, [today]);
     ({ rows } = await query(
-      `SELECT id, client_name AS client, visit_date AS date, visit_time AS time, technician, status, reported_problem AS details
+      `SELECT id, client_name AS client, visit_date AS date, visit_time AS time, technician, status,
+        visit_type AS visitType, reported_problem AS details, notes, annotations
        FROM appointments
        WHERE visit_date = $1 AND status <> 'cancelada'
        ORDER BY COALESCE(visit_time, '') ASC, id ASC
@@ -237,7 +244,8 @@ export async function buildDashboardReport(metric, options = {}) {
   if (metric === 'upcomingAppointments') {
     total = await count(`SELECT COUNT(*) AS total FROM appointments WHERE visit_date >= $1 AND status <> 'cancelada'`, [today]);
     ({ rows } = await query(
-      `SELECT id, client_name AS client, visit_date AS date, visit_time AS time, technician, status, reported_problem AS details
+      `SELECT id, client_name AS client, visit_date AS date, visit_time AS time, technician, status,
+        visit_type AS visitType, reported_problem AS details, notes, annotations
        FROM appointments
        WHERE visit_date >= $1 AND status <> 'cancelada'
        ORDER BY visit_date ASC, COALESCE(visit_time, '') ASC, id ASC

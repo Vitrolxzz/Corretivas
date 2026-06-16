@@ -48,6 +48,7 @@ const allowedOrigins = new Set(
 
 const healthOptions = new Set(['Ok', 'Nulo']);
 const appointmentStatuses = new Set(['agendada', 'realizada', 'cancelada']);
+const appointmentVisitTypes = new Set(['garantia', 'retorno']);
 const turnstileStatuses = new Set(['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue']);
 const caseSituations = new Set(['com problema', 'em observação', 'em testes', 'ok']);
 
@@ -286,6 +287,22 @@ function cleanAppointmentStatus(value) {
   return normalized;
 }
 
+function cleanAppointmentVisitType(value) {
+  const normalized = cleanText(value).toLowerCase();
+
+  if (!normalized) {
+    return '';
+  }
+
+  if (!appointmentVisitTypes.has(normalized)) {
+    const error = new Error('Tipo de visita invalido.');
+    error.status = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
 function cleanTurnstileStatus(value) {
   const normalized = cleanText(value) || 'Aguardando montagem';
 
@@ -460,6 +477,8 @@ function appointmentToJson(row) {
     address: row.address,
     reportedProblem: row.reported_problem,
     notes: row.notes,
+    annotations: row.annotations,
+    visitType: row.visit_type,
     visitDate: dateToJson(row.visit_date),
     visitTime: row.visit_time,
     technician: row.technician,
@@ -589,6 +608,8 @@ function appointmentPayload(body) {
     address: cleanText(body.address),
     reportedProblem: cleanText(body.reportedProblem),
     notes: cleanText(body.notes),
+    annotations: cleanText(body.annotations),
+    visitType: cleanAppointmentVisitType(body.visitType),
     visitDate: cleanDate(body.visitDate),
     visitTime: cleanTime(body.visitTime),
     technician: normalizeTechnicianName(body.technician),
@@ -1181,6 +1202,7 @@ app.get(
     const whereParts = [];
     const search = cleanText(req.query.search);
     const technician = cleanText(req.query.technician);
+    const visitType = cleanAppointmentVisitType(req.query.visitType);
     const { startDate, endDate } = dateFiltersFromQuery(req.query);
 
     if (search) {
@@ -1190,6 +1212,7 @@ app.get(
         OR address LIKE $${params.length} COLLATE NOCASE
         OR reported_problem LIKE $${params.length} COLLATE NOCASE
         OR notes LIKE $${params.length} COLLATE NOCASE
+        OR annotations LIKE $${params.length} COLLATE NOCASE
         OR technician LIKE $${params.length} COLLATE NOCASE
       )`);
     }
@@ -1197,6 +1220,11 @@ app.get(
     if (technician) {
       params.push(technician);
       whereParts.push(`technician = $${params.length} COLLATE NOCASE`);
+    }
+
+    if (visitType) {
+      params.push(visitType);
+      whereParts.push(`visit_type = $${params.length}`);
     }
 
     if (startDate) {
@@ -1302,16 +1330,18 @@ app.post(
     const payload = appointmentPayload(req.body);
     const inserted = await query(
       `INSERT INTO appointments (
-        client_name, address, reported_problem, notes, visit_date, visit_time,
-        technician, visit_value, parts_value, status
+        client_name, address, reported_problem, notes, annotations, visit_type,
+        visit_date, visit_time, technician, visit_value, parts_value, status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
         payload.clientName,
         payload.address,
         payload.reportedProblem,
         payload.notes,
+        payload.annotations,
+        payload.visitType,
         payload.visitDate,
         payload.visitTime,
         payload.technician,
@@ -1339,12 +1369,14 @@ app.put(
            address = $3,
            reported_problem = $4,
            notes = $5,
-           visit_date = $6,
-           visit_time = $7,
-           technician = $8,
-           visit_value = $9,
-           parts_value = $10,
-           status = $11
+           annotations = $6,
+           visit_type = $7,
+           visit_date = $8,
+           visit_time = $9,
+           technician = $10,
+           visit_value = $11,
+           parts_value = $12,
+           status = $13
        WHERE id = $1
        RETURNING *`,
       [
@@ -1353,6 +1385,8 @@ app.put(
         payload.address,
         payload.reportedProblem,
         payload.notes,
+        payload.annotations,
+        payload.visitType,
         payload.visitDate,
         payload.visitTime,
         payload.technician,
@@ -2951,6 +2985,7 @@ app.get(
       const whereParts = [];
       const search = cleanText(req.query.search);
       const technician = cleanText(req.query.technician);
+      const visitType = cleanAppointmentVisitType(req.query.visitType);
       const { startDate, endDate } = dateFiltersFromQuery(req.query);
 
       if (search) {
@@ -2960,6 +2995,7 @@ app.get(
           OR address LIKE $${params.length} COLLATE NOCASE
           OR reported_problem LIKE $${params.length} COLLATE NOCASE
           OR notes LIKE $${params.length} COLLATE NOCASE
+          OR annotations LIKE $${params.length} COLLATE NOCASE
           OR technician LIKE $${params.length} COLLATE NOCASE
         )`);
       }
@@ -2967,6 +3003,11 @@ app.get(
       if (technician) {
         params.push(technician);
         whereParts.push(`technician = $${params.length} COLLATE NOCASE`);
+      }
+
+      if (visitType) {
+        params.push(visitType);
+        whereParts.push(`visit_type = $${params.length}`);
       }
 
       if (startDate) {
@@ -2992,6 +3033,8 @@ app.get(
         ['Endereco', 'address'],
         ['Problema', 'reported_problem'],
         ['Observacoes', 'notes'],
+        ['Anotacoes', 'annotations'],
+        ['Tipo visita', 'visit_type'],
         ['Data', 'visit_date'],
         ['Horario', 'visit_time'],
         ['Tecnico', 'technician'],

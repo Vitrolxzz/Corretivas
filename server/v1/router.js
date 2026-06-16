@@ -175,6 +175,8 @@ function appointmentToJson(row) {
     address: row.address,
     reportedProblem: row.reported_problem,
     notes: row.notes,
+    annotations: row.annotations,
+    visitType: row.visit_type,
     visitDate: dateToJson(row.visit_date),
     visitTime: row.visit_time,
     technician: row.technician,

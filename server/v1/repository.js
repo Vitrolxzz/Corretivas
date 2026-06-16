@@ -59,6 +59,8 @@ const resources = {
       address: 'address',
       reportedProblem: 'reported_problem',
       notes: 'notes',
+      annotations: 'annotations',
+      visitType: 'visit_type',
       visitDate: 'visit_date',
       visitTime: 'visit_time',
       technician: 'technician',
@@ -180,6 +182,22 @@ function normalizeTechnicianName(value) {
   return text;
 }
 
+function normalizeAppointmentVisitType(value) {
+  const text = String(value || '').trim().toLowerCase();
+
+  if (!text) {
+    return '';
+  }
+
+  if (text !== 'garantia' && text !== 'retorno') {
+    const error = new Error('Tipo visita invalido. Use garantia ou retorno.');
+    error.status = 400;
+    throw error;
+  }
+
+  return text;
+}
+
 function normalizePayload(body, config) {
   const normalized = { ...body };
 
@@ -199,6 +217,10 @@ function normalizePayload(body, config) {
     if (Object.prototype.hasOwnProperty.call(normalized, field)) {
       normalized[field] = normalizeTechnicianName(normalized[field]);
     }
+  }
+
+  if (config.table === 'appointments' && Object.prototype.hasOwnProperty.call(normalized, 'visitType')) {
+    normalized.visitType = normalizeAppointmentVisitType(normalized.visitType);
   }
 
   return normalized;
@@ -238,7 +260,17 @@ export async function listRecords(resource, options = {}) {
 
   if (backend() === 'firebase') {
     const db = firestore();
-    const snapshot = await db.collection(config.collection).limit(limit).get();
+    let ref = db.collection(config.collection);
+
+    if (resource === 'agendamentos') {
+      const visitType = normalizeAppointmentVisitType(options.visitType);
+
+      if (visitType) {
+        ref = ref.where('visitType', '==', visitType);
+      }
+    }
+
+    const snapshot = await ref.limit(limit).get();
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
@@ -265,14 +297,25 @@ export async function listRecords(resource, options = {}) {
   }
 
   if (resource === 'agendamentos') {
+    const visitType = normalizeAppointmentVisitType(options.visitType);
+    const params = [];
+    const whereParts = [];
+
+    if (visitType) {
+      params.push(visitType);
+      whereParts.push(`visit_type = $${params.length}`);
+    }
+
+    const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
     const { rows } = await query(
       `SELECT appointments.*, (
         SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
        ) AS photo_count
        FROM appointments
+       ${where}
        ORDER BY id DESC
-       LIMIT $1`,
-      [limit],
+       LIMIT $${params.length + 1}`,
+      [...params, limit],
     );
     return rows.map((row) => toApi(row, config));
   }

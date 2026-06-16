@@ -1127,6 +1127,7 @@ class _ResourcePageState extends State<ResourcePage> {
   final _queue = OfflineQueue();
   final _search = TextEditingController();
   List<Map<String, dynamic>> _records = [];
+  String _visitTypeFilter = '';
   bool _loading = true;
   String? _error;
 
@@ -1142,6 +1143,10 @@ class _ResourcePageState extends State<ResourcePage> {
 
     if (oldWidget.resource != widget.resource ||
         oldWidget.refreshKey != widget.refreshKey) {
+      if (oldWidget.resource != widget.resource &&
+          widget.resource != 'agendamentos') {
+        _visitTypeFilter = '';
+      }
       _load();
     }
   }
@@ -1153,7 +1158,11 @@ class _ResourcePageState extends State<ResourcePage> {
     });
 
     try {
-      final data = await widget.api.get('/${widget.resource}');
+      final query =
+          widget.resource == 'agendamentos' && _visitTypeFilter.isNotEmpty
+              ? '?visitType=${Uri.encodeComponent(_visitTypeFilter)}'
+              : '';
+      final data = await widget.api.get('/${widget.resource}$query');
       final records = (data['records'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>();
 
@@ -1304,6 +1313,22 @@ class _ResourcePageState extends State<ResourcePage> {
                 prefixIcon: Icon(Icons.search_rounded), labelText: 'Buscar'),
             onChanged: (_) => setState(() {}),
           ),
+          if (widget.resource == 'agendamentos') ...[
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: _visitTypeFilter,
+              decoration: const InputDecoration(labelText: 'Tipo visita'),
+              items: const [
+                DropdownMenuItem(value: '', child: Text('Todos os tipos')),
+                DropdownMenuItem(value: 'garantia', child: Text('garantia')),
+                DropdownMenuItem(value: 'retorno', child: Text('retorno')),
+              ],
+              onChanged: (value) {
+                setState(() => _visitTypeFilter = value ?? '');
+                _load();
+              },
+            ),
+          ],
           if (_loading)
             const Padding(
                 padding: EdgeInsets.all(28),
@@ -1416,8 +1441,30 @@ class _ResourceEditorState extends State<ResourceEditor> {
   }
 
   Widget _buildEditorField(MapEntry<String, TextEditingController> entry) {
-    if (widget.resource == 'agendamentos' && entry.key == 'notes') {
+    if (widget.resource == 'agendamentos' && entry.key == 'annotations') {
       return _AppointmentNotesEditor(controller: entry.value);
+    }
+
+    if (widget.resource == 'agendamentos' && entry.key == 'visitType') {
+      final raw = entry.value.text.trim().toLowerCase();
+      final current = appointmentVisitTypeOptions.contains(raw) ? raw : '';
+
+      if (entry.value.text != current) {
+        entry.value.text = current;
+      }
+
+      return DropdownButtonFormField<String>(
+        initialValue: current,
+        decoration: InputDecoration(labelText: fieldLabel(entry.key)),
+        items: const [
+          DropdownMenuItem(value: '', child: Text('Selecione')),
+          DropdownMenuItem(value: 'garantia', child: Text('garantia')),
+          DropdownMenuItem(value: 'retorno', child: Text('retorno')),
+        ],
+        onChanged: (value) {
+          entry.value.text = value ?? '';
+        },
+      );
     }
 
     if (widget.resource == 'agendamentos' && entry.key == 'status') {
@@ -2248,11 +2295,13 @@ List<String> editorFields(String resource) {
         'address',
         'reportedProblem',
         'notes',
+        'annotations',
         'visitDate',
         'visitTime',
         'technician',
         'visitValue',
         'partsValue',
+        'visitType',
         'status'
       ],
     'comandas' => [
@@ -2291,6 +2340,7 @@ const dateFieldKeys = {
 const numberFieldKeys = {'difficulty', 'visitValue', 'partsValue'};
 
 const appointmentStatusOptions = ['agendada', 'realizada', 'cancelada'];
+const appointmentVisitTypeOptions = ['garantia', 'retorno'];
 
 dynamic editorValue(String resource, String key, String value) {
   final text = value.trim();
@@ -2319,6 +2369,11 @@ dynamic editorValue(String resource, String key, String value) {
 
   if (resource == 'agendamentos' && key == 'status') {
     return appointmentStatusOptions.contains(text) ? text : 'agendada';
+  }
+
+  if (resource == 'agendamentos' && key == 'visitType') {
+    final normalized = text.toLowerCase();
+    return appointmentVisitTypeOptions.contains(normalized) ? normalized : '';
   }
 
   if (key == 'status' && text.isEmpty) {
@@ -2379,6 +2434,7 @@ String fieldLabel(String key) {
     'address': 'Endereco',
     'contact': 'Contato',
     'notes': 'Observacoes',
+    'annotations': 'Anotacoes do agendamento',
     'email': 'E-mail',
     'phone': 'Telefone',
     'role': 'Perfil',
@@ -2399,6 +2455,7 @@ String fieldLabel(String key) {
     'visitTime': 'Horario',
     'visitValue': 'Valor da visita',
     'partsValue': 'Valor das pecas',
+    'visitType': 'Tipo visita',
     'status': 'Status',
     'bakery': 'Padaria',
     'dmConf': 'D/M Conf.',

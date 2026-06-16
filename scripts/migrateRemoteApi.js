@@ -60,6 +60,8 @@ const resources = [
       address: 'address',
       reported_problem: 'reportedProblem',
       notes: 'notes',
+      annotations: 'annotations',
+      visit_type: 'visitType',
       visit_date: 'visitDate',
       visit_time: 'visitTime',
       technician: 'technician',

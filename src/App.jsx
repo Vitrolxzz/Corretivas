@@ -53,6 +53,7 @@ const difficultyOptions = [
   { value: '5', label: '5 - muito dificil' },
 ];
 const appointmentStatuses = ['agendada', 'realizada', 'cancelada'];
+const appointmentVisitTypes = ['garantia', 'retorno'];
 const turnstileStatuses = ['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue'];
 const dashboardMetricTiles = [
   { metric: 'todayAppointments', icon: CalendarDays, label: 'Agendamentos do dia', stat: 'todayAppointments' },
@@ -100,6 +101,8 @@ const emptyAppointment = {
   address: '',
   reportedProblem: '',
   notes: '',
+  annotations: '',
+  visitType: '',
   visitDate: '',
   visitTime: '',
   technician: '',
@@ -563,6 +566,7 @@ export default function App() {
   const [appointmentsPage, setAppointmentsPage] = useState(1);
   const [appointmentsSearch, setAppointmentsSearch] = useState('');
   const [appointmentsTechnician, setAppointmentsTechnician] = useState('');
+  const [appointmentsVisitType, setAppointmentsVisitType] = useState('');
   const [appointmentsStartDate, setAppointmentsStartDate] = useState('');
   const [appointmentsEndDate, setAppointmentsEndDate] = useState('');
   const [appointmentForm, setAppointmentForm] = useState(emptyAppointment);
@@ -605,6 +609,7 @@ export default function App() {
   const appointmentExportParams = {
     search: appointmentsSearch,
     technician: appointmentsTechnician,
+    visitType: appointmentsVisitType,
     startDate: appointmentsStartDate,
     endDate: appointmentsEndDate,
   };
@@ -739,6 +744,10 @@ export default function App() {
       params.set('technician', appointmentsTechnician);
     }
 
+    if (appointmentsVisitType) {
+      params.set('visitType', appointmentsVisitType);
+    }
+
     if (appointmentsStartDate) {
       params.set('startDate', appointmentsStartDate);
     }
@@ -750,7 +759,7 @@ export default function App() {
     const data = await request(`/api/appointments?${params}`);
     setAppointments(data.records);
     setAppointmentsTotal(data.total);
-  }, [appointmentsPage, appointmentsSearch, appointmentsTechnician, appointmentsStartDate, appointmentsEndDate]);
+  }, [appointmentsPage, appointmentsSearch, appointmentsTechnician, appointmentsVisitType, appointmentsStartDate, appointmentsEndDate]);
 
   const loadAppointmentPhotos = useCallback(async (id) => {
     if (!id) {
@@ -878,7 +887,7 @@ export default function App() {
 
   useEffect(() => {
     setAppointmentsPage(1);
-  }, [appointmentsSearch, appointmentsTechnician, appointmentsStartDate, appointmentsEndDate]);
+  }, [appointmentsSearch, appointmentsTechnician, appointmentsVisitType, appointmentsStartDate, appointmentsEndDate]);
 
   function updateCorrective(field, value) {
     const normalizedValue = field === 'client'
@@ -997,6 +1006,8 @@ export default function App() {
           address: data.record.address,
           reportedProblem: data.record.reportedProblem,
           notes: data.record.notes,
+          annotations: data.record.annotations,
+          visitType: data.record.visitType,
           visitDate: data.record.visitDate,
           visitTime: data.record.visitTime,
           technician: data.record.technician,
@@ -1130,6 +1141,8 @@ export default function App() {
         address: record.address,
         reportedProblem: record.reportedProblem,
         notes: record.notes,
+        annotations: record.annotations,
+        visitType: record.visitType,
         visitDate: record.visitDate,
         visitTime: record.visitTime,
         technician: record.technician,
@@ -1682,6 +1695,9 @@ export default function App() {
                   onChange={(event) => updateAppointment('reportedProblem', event.target.value)}
                 />
               </Field>
+              <Field label="Observacoes">
+                <textarea rows="3" value={appointmentForm.notes} onChange={(event) => updateAppointment('notes', event.target.value)} />
+              </Field>
               <div className="notes-block">
                 <div className="notes-block-title">
                   <strong>Anotacoes do agendamento</strong>
@@ -1689,8 +1705,8 @@ export default function App() {
                 </div>
                 <textarea
                   rows="4"
-                  value={appointmentForm.notes}
-                  onChange={(event) => updateAppointment('notes', event.target.value)}
+                  value={appointmentForm.annotations}
+                  onChange={(event) => updateAppointment('annotations', event.target.value)}
                 />
               </div>
               <div className="form-grid two-fields">
@@ -1736,13 +1752,25 @@ export default function App() {
                   />
                 </Field>
               </div>
-              <Field label="Status">
-                <select value={appointmentForm.status} onChange={(event) => updateAppointment('status', event.target.value)}>
-                  {appointmentStatuses.map((status) => (
-                    <option key={status}>{status}</option>
-                  ))}
-                </select>
-              </Field>
+              <div className="form-grid two-fields">
+                <Field label="Tipo visita">
+                  <select value={appointmentForm.visitType} onChange={(event) => updateAppointment('visitType', event.target.value)}>
+                    <option value="">Selecione</option>
+                    {appointmentVisitTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Status">
+                  <select value={appointmentForm.status} onChange={(event) => updateAppointment('status', event.target.value)}>
+                    {appointmentStatuses.map((status) => (
+                      <option key={status}>{status}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
             </div>
             <div className="form-actions">
               <button className="primary-button" type="submit">
@@ -1795,6 +1823,14 @@ export default function App() {
                   <option key={technician}>{technician}</option>
                 ))}
               </select>
+              <select value={appointmentsVisitType} onChange={(event) => setAppointmentsVisitType(event.target.value)}>
+                <option value="">Todos os tipos</option>
+                {appointmentVisitTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
               <input type="date" value={appointmentsStartDate} onChange={(event) => setAppointmentsStartDate(event.target.value)} />
               <input type="date" value={appointmentsEndDate} onChange={(event) => setAppointmentsEndDate(event.target.value)} />
               <div className="segmented">
@@ -1838,6 +1874,7 @@ export default function App() {
                         <th>Tecnico</th>
                         <th>Valores</th>
                         <th>Fotos</th>
+                        <th>Tipo visita</th>
                         <th>Status</th>
                         <th className="actions-heading">Acoes</th>
                       </tr>
@@ -1859,6 +1896,7 @@ export default function App() {
                           <td className="long-cell">
                             <div>{record.reportedProblem}</div>
                             {record.notes && <small className="cell-note">Obs: {record.notes}</small>}
+                            {record.annotations && <small className="cell-note">Anotacoes: {record.annotations}</small>}
                           </td>
                           <td>{record.technician}</td>
                           <td>
@@ -1875,6 +1913,7 @@ export default function App() {
                               0
                             )}
                           </td>
+                          <td>{record.visitType || '-'}</td>
                           <td>
                             <StatusPill value={record.status} />
                           </td>

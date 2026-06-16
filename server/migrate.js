@@ -109,6 +109,8 @@ const schema = [
     address TEXT NOT NULL DEFAULT '',
     reported_problem TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
+    annotations TEXT NOT NULL DEFAULT '',
+    visit_type TEXT NOT NULL DEFAULT '',
     visit_date TEXT,
     visit_time TEXT,
     technician TEXT NOT NULL DEFAULT '',
@@ -402,6 +404,12 @@ export async function migrate() {
   await ensureColumn('appointment_photos', 'optimized_height', 'INTEGER');
   await ensureColumn('audit_logs', 'user_name', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'notes', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn('appointments', 'annotations', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn('appointments', 'visit_type', "TEXT NOT NULL DEFAULT ''");
+  await query(
+    `CREATE INDEX IF NOT EXISTS appointment_visit_type_idx
+     ON appointments (visit_type, visit_date DESC, id DESC)`,
+  );
   await normalizeExistingNames();
 
   const defaultYear = getDefaultYear();
