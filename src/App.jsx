@@ -1698,17 +1698,6 @@ export default function App() {
               <Field label="Observacoes">
                 <textarea rows="3" value={appointmentForm.notes} onChange={(event) => updateAppointment('notes', event.target.value)} />
               </Field>
-              <div className="notes-block">
-                <div className="notes-block-title">
-                  <strong>Anotacoes do agendamento</strong>
-                  <span>Informacoes importantes para a proxima visita</span>
-                </div>
-                <textarea
-                  rows="4"
-                  value={appointmentForm.annotations}
-                  onChange={(event) => updateAppointment('annotations', event.target.value)}
-                />
-              </div>
               <div className="form-grid two-fields">
                 <Field label="Data da visita">
                   <input
@@ -1896,7 +1885,6 @@ export default function App() {
                           <td className="long-cell">
                             <div>{record.reportedProblem}</div>
                             {record.notes && <small className="cell-note">Obs: {record.notes}</small>}
-                            {record.annotations && <small className="cell-note">Anotacoes: {record.annotations}</small>}
                           </td>
                           <td>{record.technician}</td>
                           <td>

@@ -3033,7 +3033,6 @@ app.get(
         ['Endereco', 'address'],
         ['Problema', 'reported_problem'],
         ['Observacoes', 'notes'],
-        ['Anotacoes', 'annotations'],
         ['Tipo visita', 'visit_type'],
         ['Data', 'visit_date'],
         ['Horario', 'visit_time'],

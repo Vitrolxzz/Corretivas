@@ -1441,10 +1441,6 @@ class _ResourceEditorState extends State<ResourceEditor> {
   }
 
   Widget _buildEditorField(MapEntry<String, TextEditingController> entry) {
-    if (widget.resource == 'agendamentos' && entry.key == 'annotations') {
-      return _AppointmentNotesEditor(controller: entry.value);
-    }
-
     if (widget.resource == 'agendamentos' && entry.key == 'visitType') {
       final raw = entry.value.text.trim().toLowerCase();
       final current = appointmentVisitTypeOptions.contains(raw) ? raw : '';
@@ -1539,46 +1535,6 @@ class _ResourceEditorState extends State<ResourceEditor> {
                 label: const Text('Salvar')),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _AppointmentNotesEditor extends StatelessWidget {
-  const _AppointmentNotesEditor({required this.controller});
-
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: CorretivasTheme.panelSoft,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: CorretivasTheme.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Anotacoes do agendamento',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          const Text('Informacoes importantes para a proxima visita',
-              style: TextStyle(color: CorretivasTheme.muted, fontSize: 12)),
-          const SizedBox(height: 10),
-          TextField(
-            controller: controller,
-            minLines: 3,
-            maxLines: 6,
-            decoration: const InputDecoration(
-              hintText: 'Digite pecas pendentes, combinados e observacoes',
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -2127,7 +2083,14 @@ String recordTitle(Map<String, dynamic> record) {
 }
 
 String recordSubtitle(Map<String, dynamic> record) {
-  final ignored = {'id', 'createdAt', 'updatedAt', 'photoCount', 'photo_count'};
+  final ignored = {
+    'id',
+    'createdAt',
+    'updatedAt',
+    'photoCount',
+    'photo_count',
+    'annotations',
+  };
   return record.entries
       .where((entry) =>
           !ignored.contains(entry.key) &&
@@ -2259,7 +2222,7 @@ List<String> detailFields(String resource, Map<String, dynamic> record) {
 Set<String> hiddenDetailFields(String resource) {
   return switch (resource) {
     'ocorrencias' => {'periodId', 'sourceHash'},
-    'agendamentos' => {'photoCount', 'photo_count'},
+    'agendamentos' => {'photoCount', 'photo_count', 'annotations'},
     'catracas' => {'photoCount', 'photo_count'},
     _ => const <String>{},
   };
@@ -2295,7 +2258,6 @@ List<String> editorFields(String resource) {
         'address',
         'reportedProblem',
         'notes',
-        'annotations',
         'visitDate',
         'visitTime',
         'technician',
@@ -2434,7 +2396,6 @@ String fieldLabel(String key) {
     'address': 'Endereco',
     'contact': 'Contato',
     'notes': 'Observacoes',
-    'annotations': 'Anotacoes do agendamento',
     'email': 'E-mail',
     'phone': 'Telefone',
     'role': 'Perfil',

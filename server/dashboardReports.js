@@ -15,7 +15,6 @@ const reportDefinitions = {
       ['Tipo visita', 'visitType'],
       ['Problema', 'details'],
       ['Observacoes', 'notes'],
-      ['Anotacoes', 'annotations'],
     ],
   },
   upcomingAppointments: {
@@ -30,7 +29,6 @@ const reportDefinitions = {
       ['Tipo visita', 'visitType'],
       ['Problema', 'details'],
       ['Observacoes', 'notes'],
-      ['Anotacoes', 'annotations'],
     ],
   },
   openCorrectives: {
@@ -232,7 +230,7 @@ export async function buildDashboardReport(metric, options = {}) {
     total = await count(`SELECT COUNT(*) AS total FROM appointments WHERE visit_date = $1 AND status <> 'cancelada'`, [today]);
     ({ rows } = await query(
       `SELECT id, client_name AS client, visit_date AS date, visit_time AS time, technician, status,
-        visit_type AS visitType, reported_problem AS details, notes, annotations
+        visit_type AS visitType, reported_problem AS details, notes
        FROM appointments
        WHERE visit_date = $1 AND status <> 'cancelada'
        ORDER BY COALESCE(visit_time, '') ASC, id ASC
@@ -245,7 +243,7 @@ export async function buildDashboardReport(metric, options = {}) {
     total = await count(`SELECT COUNT(*) AS total FROM appointments WHERE visit_date >= $1 AND status <> 'cancelada'`, [today]);
     ({ rows } = await query(
       `SELECT id, client_name AS client, visit_date AS date, visit_time AS time, technician, status,
-        visit_type AS visitType, reported_problem AS details, notes, annotations
+        visit_type AS visitType, reported_problem AS details, notes
        FROM appointments
        WHERE visit_date >= $1 AND status <> 'cancelada'
        ORDER BY visit_date ASC, COALESCE(visit_time, '') ASC, id ASC
