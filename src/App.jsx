@@ -31,7 +31,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import { eventSource, exportUrl, photoDownloadUrl, request } from './api.js';
+import { eventSource, exportUrl, photoDownloadUrl, photoImageUrl, request } from './api.js';
 
 const CalendarView = lazy(() => import('./CalendarView.jsx'));
 
@@ -1608,7 +1608,7 @@ export default function App() {
                 <div className="photo-grid">
                   {appointmentPhotos.map((photo) => (
                     <a key={photo.id} href={photoDownloadUrl(photo.id, 'appointments')} title="Baixar imagem">
-                      <img src={photo.publicPath} alt={photo.originalName || photo.fileName} />
+                      <img src={photoImageUrl(photo)} alt={photo.originalName || photo.fileName} />
                       <span>{photo.originalName || photo.fileName}</span>
                     </a>
                   ))}
@@ -2313,7 +2313,7 @@ export default function App() {
                 <div className="photo-grid">
                   {turnstilePhotos.map((photo) => (
                     <a key={photo.id} href={photoDownloadUrl(photo.id)} title="Baixar imagem">
-                      <img src={photo.publicPath} alt={photo.originalName || photo.fileName} />
+                      <img src={photoImageUrl(photo)} alt={photo.originalName || photo.fileName} />
                       <span>{photo.originalName || photo.fileName}</span>
                     </a>
                   ))}

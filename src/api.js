@@ -54,3 +54,13 @@ export function exportUrl(resource, format, params = {}) {
 export function photoDownloadUrl(photoId, resource = 'turnstiles') {
   return `${apiBase}/api/${resource}/photos/${encodeURIComponent(photoId)}/download`;
 }
+
+export function photoImageUrl(photo) {
+  const path = String(photo?.publicUrl || photo?.publicPath || '').trim();
+
+  if (!path || path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
+  }
+
+  return path.startsWith('/') ? `${apiBase}${path}` : path;
+}
