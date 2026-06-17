@@ -103,6 +103,21 @@ const resources = [
       created_by: 'createdBy',
     },
   },
+  {
+    resource: 'empresas',
+    table: 'companies',
+    fields: {
+      name: 'name',
+      cnpj: 'cnpj',
+      system_name: 'systemName',
+      xml: 'xml',
+      ip: 'ip',
+      port: 'port',
+      turnstile_type: 'turnstileType',
+      anydesk: 'anydesk',
+      notes: 'notes',
+    },
+  },
 ];
 
 function parseArgs(args) {

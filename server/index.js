@@ -543,6 +543,23 @@ function systemNoteToJson(row) {
   };
 }
 
+function companyToJson(row) {
+  return {
+    id: Number(row.id),
+    name: row.name,
+    cnpj: row.cnpj,
+    systemName: row.system_name,
+    xml: row.xml,
+    ip: row.ip,
+    port: row.port,
+    turnstileType: row.turnstile_type,
+    anydesk: row.anydesk,
+    notes: row.notes,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+  };
+}
+
 function turnstilePhotoToJson(row) {
   return {
     id: Number(row.id),
@@ -655,6 +672,36 @@ function systemNotePayload(body) {
     title,
     content,
     createdBy: cleanText(body.createdBy) || 'Sistema web',
+  };
+}
+
+function cleanCompanyXml(value) {
+  const normalized = cleanText(value).toLocaleLowerCase('pt-BR');
+
+  if (!normalized || normalized === 'nao') {
+    return 'não';
+  }
+
+  if (normalized === 'sim' || normalized === 'não') {
+    return normalized;
+  }
+
+  const error = new Error('XML invalido. Use sim ou não.');
+  error.status = 400;
+  throw error;
+}
+
+function companyPayload(body) {
+  return {
+    name: cleanText(body.name),
+    cnpj: cleanText(body.cnpj),
+    systemName: cleanText(body.systemName),
+    xml: cleanCompanyXml(body.xml),
+    ip: cleanText(body.ip),
+    port: cleanText(body.port),
+    turnstileType: cleanText(body.turnstileType),
+    anydesk: cleanText(body.anydesk),
+    notes: cleanText(body.notes),
   };
 }
 
@@ -1336,6 +1383,130 @@ app.delete(
   asyncRoute(async (req, res) => {
     await query('DELETE FROM system_notes WHERE id = $1', [Number(req.params.id)]);
     broadcast({ table: 'system_notes', action: 'deleted', id: Number(req.params.id) });
+    res.status(204).end();
+  }),
+);
+
+app.get(
+  '/api/companies',
+  asyncRoute(async (req, res) => {
+    const params = [];
+    const whereParts = [];
+    const search = cleanText(req.query.search);
+
+    if (search) {
+      params.push(likeParam(search));
+      whereParts.push(`(
+        name LIKE $${params.length} COLLATE NOCASE
+        OR cnpj LIKE $${params.length} COLLATE NOCASE
+      )`);
+    }
+
+    const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const { rows } = await query(
+      `SELECT *
+       FROM companies
+       ${where}
+       ORDER BY name COLLATE NOCASE, id DESC
+       LIMIT 500`,
+      params,
+    );
+
+    res.json({ records: rows.map(companyToJson) });
+  }),
+);
+
+app.get(
+  '/api/companies/:id',
+  asyncRoute(async (req, res) => {
+    const { rows } = await query('SELECT * FROM companies WHERE id = $1', [Number(req.params.id)]);
+
+    if (!rows[0]) {
+      const error = new Error('Empresa nao encontrada.');
+      error.status = 404;
+      throw error;
+    }
+
+    res.json({ record: companyToJson(rows[0]) });
+  }),
+);
+
+app.post(
+  '/api/companies',
+  asyncRoute(async (req, res) => {
+    const payload = companyPayload(req.body || {});
+    const { rows } = await query(
+      `INSERT INTO companies (
+        name, cnpj, system_name, xml, ip, port, turnstile_type, anydesk, notes
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *`,
+      [
+        payload.name,
+        payload.cnpj,
+        payload.systemName,
+        payload.xml,
+        payload.ip,
+        payload.port,
+        payload.turnstileType,
+        payload.anydesk,
+        payload.notes,
+      ],
+    );
+    const record = companyToJson(rows[0]);
+    broadcast({ table: 'companies', action: 'created', id: record.id });
+    res.status(201).json({ record });
+  }),
+);
+
+app.put(
+  '/api/companies/:id',
+  asyncRoute(async (req, res) => {
+    const payload = companyPayload(req.body || {});
+    const { rows } = await query(
+      `UPDATE companies
+       SET name = $2,
+           cnpj = $3,
+           system_name = $4,
+           xml = $5,
+           ip = $6,
+           port = $7,
+           turnstile_type = $8,
+           anydesk = $9,
+           notes = $10
+       WHERE id = $1
+       RETURNING *`,
+      [
+        Number(req.params.id),
+        payload.name,
+        payload.cnpj,
+        payload.systemName,
+        payload.xml,
+        payload.ip,
+        payload.port,
+        payload.turnstileType,
+        payload.anydesk,
+        payload.notes,
+      ],
+    );
+
+    if (!rows[0]) {
+      const error = new Error('Empresa nao encontrada.');
+      error.status = 404;
+      throw error;
+    }
+
+    const record = companyToJson(rows[0]);
+    broadcast({ table: 'companies', action: 'updated', id: record.id });
+    res.json({ record });
+  }),
+);
+
+app.delete(
+  '/api/companies/:id',
+  asyncRoute(async (req, res) => {
+    await query('DELETE FROM companies WHERE id = $1', [Number(req.params.id)]);
+    broadcast({ table: 'companies', action: 'deleted', id: Number(req.params.id) });
     res.status(204).end();
   }),
 );
@@ -2459,7 +2630,7 @@ app.get(
     }
 
     const like = likeParam(search);
-    const [clients, correctives, commands, appointments, turnstiles, notes] = await Promise.all([
+    const [clients, correctives, commands, appointments, turnstiles, notes, companies] = await Promise.all([
       query(
         `SELECT name
          FROM (
@@ -2530,6 +2701,15 @@ app.get(
          LIMIT 8`,
         [like],
       ),
+      query(
+        `SELECT id, name, cnpj, system_name
+         FROM companies
+         WHERE name LIKE $1 COLLATE NOCASE
+            OR cnpj LIKE $1 COLLATE NOCASE
+         ORDER BY name COLLATE NOCASE, id DESC
+         LIMIT 8`,
+        [like],
+      ),
     ]);
 
     const groups = [
@@ -2588,6 +2768,15 @@ app.get(
           id: Number(row.id),
           label: row.title || `Anotacao #${row.id}`,
           description: [row.content, row.created_by].filter(Boolean).join(' | ') || 'Anotacao do sistema',
+        })),
+      },
+      {
+        category: 'Empresas',
+        type: 'company',
+        items: companies.rows.map((row) => ({
+          id: Number(row.id),
+          label: row.name || `Empresa #${row.id}`,
+          description: [row.cnpj, row.system_name].filter(Boolean).join(' | ') || 'Cadastro de empresa',
         })),
       },
     ].filter((group) => group.items.length);

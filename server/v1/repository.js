@@ -107,6 +107,21 @@ const resources = {
       createdBy: 'created_by',
     },
   },
+  empresas: {
+    table: 'companies',
+    collection: 'empresas',
+    fields: {
+      name: 'name',
+      cnpj: 'cnpj',
+      systemName: 'system_name',
+      xml: 'xml',
+      ip: 'ip',
+      port: 'port',
+      turnstileType: 'turnstile_type',
+      anydesk: 'anydesk',
+      notes: 'notes',
+    },
+  },
   auditoria: {
     table: 'audit_logs',
     collection: 'auditoria',
@@ -243,6 +258,17 @@ function normalizePayload(body, config) {
     }
   }
 
+  if (config.table === 'companies' && Object.prototype.hasOwnProperty.call(normalized, 'xml')) {
+    const text = String(normalized.xml || '').trim().toLowerCase();
+    normalized.xml = !text || text === 'nao' ? 'não' : text;
+
+    if (normalized.xml !== 'sim' && normalized.xml !== 'não') {
+      const error = new Error('XML invalido. Use sim ou não.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
   return normalized;
 }
 
@@ -360,6 +386,31 @@ export async function listRecords(resource, options = {}) {
        ORDER BY updated_at DESC, id DESC
        LIMIT $1`,
       [limit],
+    );
+    return rows.map((row) => toApi(row, config));
+  }
+
+  if (resource === 'empresas') {
+    const search = String(options.search || '').trim();
+    const params = [];
+    const whereParts = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      whereParts.push(`(
+        name LIKE $${params.length} COLLATE NOCASE
+        OR cnpj LIKE $${params.length} COLLATE NOCASE
+      )`);
+    }
+
+    const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const { rows } = await query(
+      `SELECT *
+       FROM companies
+       ${where}
+       ORDER BY name COLLATE NOCASE, id DESC
+       LIMIT $${params.length + 1}`,
+      [...params, limit],
     );
     return rows.map((row) => toApi(row, config));
   }

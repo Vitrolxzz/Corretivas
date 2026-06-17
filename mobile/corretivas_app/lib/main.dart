@@ -279,6 +279,12 @@ class _HomePageState extends State<HomePage> {
           refreshKey: _refreshKey),
       ResourcePage(
           api: widget.api,
+          title: 'Empresas',
+          resource: 'empresas',
+          icon: Icons.business_rounded,
+          refreshKey: _refreshKey),
+      ResourcePage(
+          api: widget.api,
           title: 'Anotacoes',
           resource: 'anotacoes',
           icon: Icons.note_alt_rounded,
@@ -379,6 +385,8 @@ class _HomePageState extends State<HomePage> {
               icon: Icon(Icons.checklist_rounded), label: Text('Comandas')),
           NavigationDrawerDestination(
               icon: Icon(Icons.build_rounded), label: Text('Catracas')),
+          NavigationDrawerDestination(
+              icon: Icon(Icons.business_rounded), label: Text('Empresas')),
           NavigationDrawerDestination(
               icon: Icon(Icons.note_alt_rounded), label: Text('Anotacoes')),
           NavigationDrawerDestination(
@@ -1167,10 +1175,19 @@ class _ResourcePageState extends State<ResourcePage> {
     });
 
     try {
-      final query =
-          widget.resource == 'agendamentos' && _visitTypeFilter.isNotEmpty
-              ? '?visitType=${Uri.encodeComponent(_visitTypeFilter)}'
-              : '';
+      final params = <String, String>{};
+
+      if (widget.resource == 'agendamentos' && _visitTypeFilter.isNotEmpty) {
+        params['visitType'] = _visitTypeFilter;
+      }
+
+      if (widget.resource == 'empresas' && _search.text.trim().isNotEmpty) {
+        params['search'] = _search.text.trim();
+      }
+
+      final query = params.isEmpty
+          ? ''
+          : '?${params.entries.map((entry) => '${Uri.encodeComponent(entry.key)}=${Uri.encodeComponent(entry.value)}').join('&')}';
       final data = await widget.api.get('/${widget.resource}$query');
       final records = (data['records'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>();
@@ -1326,7 +1343,14 @@ class _ResourcePageState extends State<ResourcePage> {
             controller: _search,
             decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search_rounded), labelText: 'Buscar'),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) {
+              if (widget.resource == 'empresas') {
+                _load();
+                return;
+              }
+
+              setState(() {});
+            },
           ),
           if (widget.resource == 'agendamentos') ...[
             const SizedBox(height: 10),
@@ -1463,6 +1487,27 @@ class _ResourceEditorState extends State<ResourceEditor> {
   }
 
   Widget _buildEditorField(MapEntry<String, TextEditingController> entry) {
+    if (widget.resource == 'empresas' && entry.key == 'xml') {
+      final raw = entry.value.text.trim().toLowerCase();
+      final current = raw == 'sim' ? 'sim' : 'não';
+
+      if (entry.value.text != current) {
+        entry.value.text = current;
+      }
+
+      return DropdownButtonFormField<String>(
+        initialValue: current,
+        decoration: InputDecoration(labelText: fieldLabel(entry.key)),
+        items: const [
+          DropdownMenuItem(value: 'sim', child: Text('sim')),
+          DropdownMenuItem(value: 'não', child: Text('não')),
+        ],
+        onChanged: (value) {
+          entry.value.text = value ?? 'não';
+        },
+      );
+    }
+
     if (widget.resource == 'agendamentos' && entry.key == 'visitType') {
       final raw = entry.value.text.trim().toLowerCase();
       final current = appointmentVisitTypeOptions.contains(raw) ? raw : '';
@@ -2384,6 +2429,17 @@ List<String> editorFields(String resource) {
         'notes',
         'status'
       ],
+    'empresas' => [
+        'name',
+        'cnpj',
+        'systemName',
+        'xml',
+        'ip',
+        'port',
+        'turnstileType',
+        'anydesk',
+        'notes',
+      ],
     'anotacoes' => [
         'title',
         'content',
@@ -2395,6 +2451,7 @@ List<String> editorFields(String resource) {
 String defaultValue(String resource, String key) {
   if (resource == 'agendamentos' && key == 'status') return 'agendada';
   if (resource == 'catracas' && key == 'status') return 'Aguardando montagem';
+  if (resource == 'empresas' && key == 'xml') return 'não';
   return '';
 }
 
@@ -2442,6 +2499,11 @@ dynamic editorValue(String resource, String key, String value) {
   if (resource == 'agendamentos' && key == 'visitType') {
     final normalized = text.toLowerCase();
     return appointmentVisitTypeOptions.contains(normalized) ? normalized : '';
+  }
+
+  if (resource == 'empresas' && key == 'xml') {
+    final normalized = text.toLowerCase();
+    return normalized == 'sim' ? 'sim' : 'não';
   }
 
   if (key == 'status' && text.isEmpty) {
@@ -2501,6 +2563,13 @@ String fieldLabel(String key) {
     'title': 'Titulo',
     'content': 'Anotacao',
     'name': 'Nome',
+    'cnpj': 'CNPJ',
+    'systemName': 'Sistema',
+    'xml': 'XML',
+    'ip': 'IP',
+    'port': 'Porta',
+    'turnstileType': 'Tipo catraca',
+    'anydesk': 'Anydesk',
     'address': 'Endereco',
     'contact': 'Contato',
     'notes': 'Observacoes',

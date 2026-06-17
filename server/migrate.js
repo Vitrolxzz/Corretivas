@@ -221,6 +221,22 @@ const schema = [
   )`,
   `CREATE INDEX IF NOT EXISTS system_notes_updated_idx
     ON system_notes (updated_at DESC, id DESC)`,
+  `CREATE TABLE IF NOT EXISTS companies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL DEFAULT '',
+    cnpj TEXT NOT NULL DEFAULT '',
+    system_name TEXT NOT NULL DEFAULT '',
+    xml TEXT NOT NULL DEFAULT 'não' CHECK (xml IN ('sim', 'não')),
+    ip TEXT NOT NULL DEFAULT '',
+    port TEXT NOT NULL DEFAULT '',
+    turnstile_type TEXT NOT NULL DEFAULT '',
+    anydesk TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS companies_name_cnpj_idx
+    ON companies (name COLLATE NOCASE, cnpj COLLATE NOCASE, id DESC)`,
   `CREATE TRIGGER IF NOT EXISTS periods_set_updated_at
     AFTER UPDATE ON periods
     FOR EACH ROW
@@ -290,6 +306,13 @@ const schema = [
     WHEN NEW.updated_at = OLD.updated_at
     BEGIN
       UPDATE system_notes SET updated_at = datetime('now') WHERE id = NEW.id;
+    END`,
+  `CREATE TRIGGER IF NOT EXISTS companies_set_updated_at
+    AFTER UPDATE ON companies
+    FOR EACH ROW
+    WHEN NEW.updated_at = OLD.updated_at
+    BEGIN
+      UPDATE companies SET updated_at = datetime('now') WHERE id = NEW.id;
     END`,
 ];
 

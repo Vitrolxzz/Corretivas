@@ -4,6 +4,7 @@ import {
   Archive,
   BarChart3,
   Bell,
+  Building2,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
@@ -41,6 +42,7 @@ const tabs = [
   { id: 'correctives', label: 'Ocorrencias', icon: ClipboardList },
   { id: 'commands', label: 'Cadastro de Comandas', icon: ListChecks },
   { id: 'turnstiles', label: 'Catracas para Montagem', icon: Wrench },
+  { id: 'companies', label: 'Empresas', icon: Building2 },
   { id: 'notes', label: 'Anotacoes', icon: FileText },
 ];
 
@@ -124,6 +126,18 @@ const emptyTurnstile = {
 const emptySystemNote = {
   title: '',
   content: '',
+};
+
+const emptyCompany = {
+  name: '',
+  cnpj: '',
+  systemName: '',
+  xml: 'não',
+  ip: '',
+  port: '',
+  turnstileType: '',
+  anydesk: '',
+  notes: '',
 };
 
 function formatDate(value) {
@@ -597,6 +611,11 @@ export default function App() {
   const [systemNoteForm, setSystemNoteForm] = useState(emptySystemNote);
   const [editingSystemNoteId, setEditingSystemNoteId] = useState(null);
 
+  const [companies, setCompanies] = useState([]);
+  const [companiesSearch, setCompaniesSearch] = useState('');
+  const [companyForm, setCompanyForm] = useState(emptyCompany);
+  const [editingCompanyId, setEditingCompanyId] = useState(null);
+
   const [technicians, setTechnicians] = useState([]);
   const [technicianStartDate, setTechnicianStartDate] = useState('');
   const [technicianEndDate, setTechnicianEndDate] = useState('');
@@ -796,6 +815,18 @@ export default function App() {
     setSystemNotes(data.records);
   }, [systemNotesSearch]);
 
+  const loadCompanies = useCallback(async () => {
+    const params = new URLSearchParams();
+
+    if (companiesSearch.trim()) {
+      params.set('search', companiesSearch.trim());
+    }
+
+    const suffix = params.toString() ? `?${params}` : '';
+    const data = await request(`/api/companies${suffix}`);
+    setCompanies(data.records);
+  }, [companiesSearch]);
+
   const loadTurnstiles = useCallback(async () => {
     const params = new URLSearchParams({ limit: '200' });
 
@@ -885,6 +916,7 @@ export default function App() {
       loadAppointments(),
       loadTurnstiles(),
       loadSystemNotes(),
+      loadCompanies(),
       loadTechnicians(),
       loadDailyReport(),
       loadMonthlyReport(),
@@ -901,6 +933,7 @@ export default function App() {
     loadAppointments,
     loadTurnstiles,
     loadSystemNotes,
+    loadCompanies,
     loadTechnicians,
     loadDailyReport,
     loadMonthlyReport,
@@ -955,6 +988,10 @@ export default function App() {
 
   function updateSystemNote(field, value) {
     setSystemNoteForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateCompany(field, value) {
+    setCompanyForm((current) => ({ ...current, [field]: value }));
   }
 
   async function refreshOperationalData() {
@@ -1081,6 +1118,22 @@ export default function App() {
       setEditingSystemNoteId(null);
       await loadSystemNotes();
       showToast(editingSystemNoteId ? 'Anotacao atualizada.' : 'Anotacao criada.');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  }
+
+  async function saveCompany(event) {
+    event.preventDefault();
+    const method = editingCompanyId ? 'PUT' : 'POST';
+    const path = editingCompanyId ? `/api/companies/${editingCompanyId}` : '/api/companies';
+
+    try {
+      await request(path, { method, body: companyForm });
+      setCompanyForm(emptyCompany);
+      setEditingCompanyId(null);
+      await loadCompanies();
+      showToast(editingCompanyId ? 'Empresa atualizada.' : 'Empresa cadastrada.');
     } catch (error) {
       showToast(error.message, 'error');
     }
@@ -1232,6 +1285,25 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function editCompany(record) {
+    setEditingCompanyId(record.id);
+    setCompanyForm(
+      normalizeForForm({
+        name: record.name,
+        cnpj: record.cnpj,
+        systemName: record.systemName,
+        xml: record.xml || 'não',
+        ip: record.ip,
+        port: record.port,
+        turnstileType: record.turnstileType,
+        anydesk: record.anydesk,
+        notes: record.notes,
+      }),
+    );
+    setActiveTab('companies');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   async function openClientHistory(name) {
     try {
       const data = await request(`/api/clients/history?name=${encodeURIComponent(name)}`);
@@ -1300,6 +1372,12 @@ export default function App() {
       if (item.type === 'note') {
         const data = await request(`/api/notes/${item.id}`);
         editSystemNote(data.record);
+        return;
+      }
+
+      if (item.type === 'company') {
+        const data = await request(`/api/companies/${item.id}`);
+        editCompany(data.record);
       }
     } catch (error) {
       showToast(error.message, 'error');
@@ -2603,6 +2681,128 @@ export default function App() {
                 </tbody>
               </table>
               {!systemNotes.length && <EmptyState label="Nenhuma anotacao cadastrada." />}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'companies' && (
+        <section className="workspace two-column">
+          <form className="entry-panel compact-panel" onSubmit={saveCompany}>
+            <div className="section-title">
+              <h2>{editingCompanyId ? 'Editar empresa' : 'Nova empresa'}</h2>
+              {editingCompanyId && (
+                <IconAction
+                  title="Cancelar edicao"
+                  onClick={() => {
+                    setEditingCompanyId(null);
+                    setCompanyForm(emptyCompany);
+                  }}
+                >
+                  <X size={18} />
+                </IconAction>
+              )}
+            </div>
+            <div className="form-grid single-column">
+              <Field label="Nome">
+                <input value={companyForm.name} onChange={(event) => updateCompany('name', event.target.value)} />
+              </Field>
+              <Field label="CNPJ">
+                <input value={companyForm.cnpj} onChange={(event) => updateCompany('cnpj', event.target.value)} />
+              </Field>
+              <Field label="Sistema">
+                <input value={companyForm.systemName} onChange={(event) => updateCompany('systemName', event.target.value)} />
+              </Field>
+              <Field label="XML">
+                <select value={companyForm.xml} onChange={(event) => updateCompany('xml', event.target.value)}>
+                  <option value="sim">sim</option>
+                  <option value="não">não</option>
+                </select>
+              </Field>
+              <Field label="IP">
+                <input value={companyForm.ip} onChange={(event) => updateCompany('ip', event.target.value)} />
+              </Field>
+              <Field label="Porta">
+                <input value={companyForm.port} onChange={(event) => updateCompany('port', event.target.value)} />
+              </Field>
+              <Field label="Tipo catraca">
+                <input value={companyForm.turnstileType} onChange={(event) => updateCompany('turnstileType', event.target.value)} />
+              </Field>
+              <Field label="Anydesk">
+                <input value={companyForm.anydesk} onChange={(event) => updateCompany('anydesk', event.target.value)} />
+              </Field>
+              <Field label="Observacoes">
+                <textarea rows="4" value={companyForm.notes} onChange={(event) => updateCompany('notes', event.target.value)} />
+              </Field>
+            </div>
+            <div className="form-actions">
+              <button className="primary-button" type="submit">
+                <Save size={18} />
+                {editingCompanyId ? 'Salvar edicao' : 'Cadastrar empresa'}
+              </button>
+            </div>
+          </form>
+
+          <div className="list-panel">
+            <div className="section-title">
+              <h2>Empresas cadastradas</h2>
+            </div>
+            <div className="toolbar">
+              <div className="search-box">
+                <Search size={17} />
+                <input
+                  placeholder="Buscar nome ou CNPJ"
+                  value={companiesSearch}
+                  onChange={(event) => setCompaniesSearch(event.target.value)}
+                />
+              </div>
+              <span className="counter">{companies.length} registros</span>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>CNPJ</th>
+                    <th>Sistema</th>
+                    <th>XML</th>
+                    <th>IP</th>
+                    <th>Porta</th>
+                    <th>Tipo catraca</th>
+                    <th>Anydesk</th>
+                    <th>Observacoes</th>
+                    <th className="actions-heading">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {companies.map((record) => (
+                    <tr key={record.id}>
+                      <td>{record.name || '-'}</td>
+                      <td>{record.cnpj || '-'}</td>
+                      <td>{record.systemName || '-'}</td>
+                      <td>{record.xml || '-'}</td>
+                      <td>{record.ip || '-'}</td>
+                      <td>{record.port || '-'}</td>
+                      <td>{record.turnstileType || '-'}</td>
+                      <td>{record.anydesk || '-'}</td>
+                      <td className="long-cell">{record.notes || '-'}</td>
+                      <td className="row-actions">
+                        <IconAction title="Editar" onClick={() => editCompany(record)}>
+                          <Edit3 size={17} />
+                        </IconAction>
+                        <IconAction
+                          title="Excluir"
+                          danger
+                          onClick={() => deleteRecord(`/api/companies/${record.id}`, loadCompanies, 'empresa')}
+                        >
+                          <Trash2 size={17} />
+                        </IconAction>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!companies.length && <EmptyState label="Nenhuma empresa cadastrada." />}
             </div>
           </div>
         </section>

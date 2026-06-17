@@ -1081,7 +1081,7 @@ export function createV1Router({ broadcast }) {
     }),
   );
 
-  const domains = ['clientes', 'ocorrencias', 'agendamentos', 'comandas', 'catracas', 'anotacoes', 'tecnicos', 'auditoria', 'logs'];
+  const domains = ['clientes', 'ocorrencias', 'agendamentos', 'comandas', 'catracas', 'empresas', 'anotacoes', 'tecnicos', 'auditoria', 'logs'];
 
   for (const domain of domains) {
     const writeRoles = domain === 'ocorrencias' || domain === 'agendamentos' || domain === 'catracas'
