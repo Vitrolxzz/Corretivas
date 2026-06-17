@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Readable } from 'node:stream';
 import sharp from 'sharp';
 import { normalizeClientName } from './clientNames.js';
 import { closePool, query, withTransaction } from './db.js';
@@ -79,10 +80,6 @@ if (legacyUploadDir !== uploadDir && existsSync(legacyUploadDir)) {
   app.use('/api/uploads', express.static(legacyUploadDir));
 }
 
-app.get(['/Corretivas.apk', '/download/Corretivas.apk', '/downloads/Corretivas.apk'], (_req, res) => {
-  res.redirect(302, apkDownloadUrl);
-});
-
 function basicHealthPayload() {
   return {
     ok: true,
@@ -95,6 +92,44 @@ function basicHealthPayload() {
 function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 }
+
+async function serveApkDownload(req, res) {
+  const upstream = await fetch(apkDownloadUrl, {
+    method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+    redirect: 'follow',
+  });
+
+  if (!upstream.ok) {
+    const error = new Error('Nao foi possivel baixar o APK.');
+    error.status = upstream.status || 502;
+    throw error;
+  }
+
+  const contentLength = upstream.headers.get('content-length');
+
+  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+  res.setHeader('Content-Disposition', 'attachment; filename="Corretivas.apk"');
+  res.setHeader('Cache-Control', 'no-store');
+
+  if (contentLength) {
+    res.setHeader('Content-Length', contentLength);
+  }
+
+  if (req.method === 'HEAD') {
+    res.status(200).end();
+    return;
+  }
+
+  if (!upstream.body) {
+    res.status(200).end();
+    return;
+  }
+
+  Readable.fromWeb(upstream.body).pipe(res);
+}
+
+app.get(['/Corretivas.apk', '/download/Corretivas.apk', '/downloads/Corretivas.apk'], asyncRoute(serveApkDownload));
+app.head(['/Corretivas.apk', '/download/Corretivas.apk', '/downloads/Corretivas.apk'], asyncRoute(serveApkDownload));
 
 function requestOrigin(req) {
   const forwardedProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();
