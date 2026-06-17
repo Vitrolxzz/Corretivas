@@ -247,6 +247,66 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> _openMoreMenu() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          children: [
+            ListTile(
+              leading: const Icon(Icons.note_alt_rounded,
+                  color: CorretivasTheme.accent),
+              title: const Text('Anotacoes'),
+              onTap: () {
+                Navigator.pop(context);
+                _selectTab(6);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.business_rounded,
+                  color: CorretivasTheme.accent),
+              title: const Text('Empresas'),
+              onTap: () {
+                Navigator.pop(context);
+                _selectTab(5);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.build_rounded,
+                  color: CorretivasTheme.accent),
+              title: const Text('Catracas'),
+              onTap: () {
+                Navigator.pop(context);
+                _selectTab(4);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people_rounded,
+                  color: CorretivasTheme.accent),
+              title: const Text('Clientes'),
+              onTap: () {
+                Navigator.pop(context);
+                _selectTab(7);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.engineering_rounded,
+                  color: CorretivasTheme.accent),
+              title: const Text('Tecnicos'),
+              onTap: () {
+                Navigator.pop(context);
+                _selectTab(8);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -348,7 +408,14 @@ class _HomePageState extends State<HomePage> {
       body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index > 4 ? 4 : _index,
-        onDestinationSelected: _selectTab,
+        onDestinationSelected: (value) {
+          if (value == 4) {
+            _openMoreMenu();
+            return;
+          }
+
+          _selectTab(value);
+        },
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
