@@ -1446,6 +1446,7 @@ class _ResourcePageState extends State<ResourcePage> {
               decoration: const InputDecoration(labelText: 'Tipo visita'),
               items: const [
                 DropdownMenuItem(value: '', child: Text('Todos os tipos')),
+                DropdownMenuItem(value: 'normal', child: Text('normal')),
                 DropdownMenuItem(value: 'garantia', child: Text('garantia')),
                 DropdownMenuItem(value: 'retorno', child: Text('retorno')),
               ],
@@ -1665,6 +1666,7 @@ class _ResourceEditorState extends State<ResourceEditor> {
         decoration: InputDecoration(labelText: fieldLabel(entry.key)),
         items: const [
           DropdownMenuItem(value: '', child: Text('Selecione')),
+          DropdownMenuItem(value: 'normal', child: Text('normal')),
           DropdownMenuItem(value: 'garantia', child: Text('garantia')),
           DropdownMenuItem(value: 'retorno', child: Text('retorno')),
         ],
@@ -2609,7 +2611,7 @@ const dateFieldKeys = {
 const numberFieldKeys = {'difficulty', 'visitValue', 'partsValue'};
 
 const appointmentStatusOptions = ['agendada', 'realizada', 'cancelada'];
-const appointmentVisitTypeOptions = ['garantia', 'retorno'];
+const appointmentVisitTypeOptions = ['normal', 'garantia', 'retorno'];
 
 dynamic editorValue(String resource, String key, String value) {
   final text = value.trim();

@@ -49,7 +49,7 @@ const allowedOrigins = new Set(
 
 const healthOptions = new Set(['Ok', 'Nulo']);
 const appointmentStatuses = new Set(['agendada', 'realizada', 'cancelada']);
-const appointmentVisitTypes = new Set(['garantia', 'retorno']);
+const appointmentVisitTypes = new Set(['normal', 'garantia', 'retorno']);
 const turnstileStatuses = new Set(['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue']);
 const caseSituations = new Set(['com problema', 'em observação', 'em testes', 'ok']);
 
@@ -330,7 +330,7 @@ function cleanAppointmentVisitType(value) {
   }
 
   if (!appointmentVisitTypes.has(normalized)) {
-    const error = new Error('Tipo de visita invalido.');
+    const error = new Error('Tipo de visita invalido. Use normal, garantia ou retorno.');
     error.status = 400;
     throw error;
   }
@@ -761,12 +761,14 @@ function appointmentVisitTypeSummaryFromRow(row) {
 
 function appointmentVisitTypeChartFromRow(row) {
   const total = Number(row?.total || 0);
+  const normal = Number(row?.normal || 0);
   const garantia = Number(row?.garantia || 0);
   const retorno = Number(row?.retorno || 0);
-  const semTipo = Math.max(0, total - garantia - retorno);
+  const semTipo = Math.max(0, total - normal - garantia - retorno);
   const percent = (value) => (total ? Math.round((Number(value || 0) / total) * 100) : 0);
 
   return [
+    { label: 'Normal', value: normal, percent: percent(normal) },
     { label: 'Garantia', value: garantia, percent: percent(garantia) },
     { label: 'Retorno', value: retorno, percent: percent(retorno) },
     { label: 'Sem tipo', value: semTipo, percent: percent(semTipo) },
@@ -1281,6 +1283,7 @@ app.get(
       query(
         `SELECT
           COUNT(*) AS total,
+          SUM(CASE WHEN visit_type = 'normal' THEN 1 ELSE 0 END) AS normal,
           SUM(CASE WHEN visit_type = 'garantia' THEN 1 ELSE 0 END) AS garantia,
           SUM(CASE WHEN visit_type = 'retorno' THEN 1 ELSE 0 END) AS retorno
          FROM appointments`,

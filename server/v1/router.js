@@ -191,12 +191,14 @@ function appointmentToJson(row) {
 
 function appointmentVisitTypeChartFromRow(row) {
   const total = Number(row?.total || 0);
+  const normal = Number(row?.normal || 0);
   const garantia = Number(row?.garantia || 0);
   const retorno = Number(row?.retorno || 0);
-  const semTipo = Math.max(0, total - garantia - retorno);
+  const semTipo = Math.max(0, total - normal - garantia - retorno);
   const percent = (value) => (total ? Math.round((Number(value || 0) / total) * 100) : 0);
 
   return [
+    { label: 'Normal', value: normal, percent: percent(normal) },
     { label: 'Garantia', value: garantia, percent: percent(garantia) },
     { label: 'Retorno', value: retorno, percent: percent(retorno) },
     { label: 'Sem tipo', value: semTipo, percent: percent(semTipo) },
@@ -490,6 +492,7 @@ export function createV1Router({ broadcast }) {
         query(
           `SELECT
             COUNT(*) AS total,
+            SUM(CASE WHEN visit_type = 'normal' THEN 1 ELSE 0 END) AS normal,
             SUM(CASE WHEN visit_type = 'garantia' THEN 1 ELSE 0 END) AS garantia,
             SUM(CASE WHEN visit_type = 'retorno' THEN 1 ELSE 0 END) AS retorno
            FROM appointments`,

@@ -213,8 +213,8 @@ function normalizeAppointmentVisitType(value) {
     return '';
   }
 
-  if (text !== 'garantia' && text !== 'retorno') {
-    const error = new Error('Tipo visita invalido. Use garantia ou retorno.');
+  if (text !== 'normal' && text !== 'garantia' && text !== 'retorno') {
+    const error = new Error('Tipo visita invalido. Use normal, garantia ou retorno.');
     error.status = 400;
     throw error;
   }

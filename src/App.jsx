@@ -56,7 +56,7 @@ const difficultyOptions = [
   { value: '5', label: '5 - muito dificil' },
 ];
 const appointmentStatuses = ['agendada', 'realizada', 'cancelada'];
-const appointmentVisitTypes = ['garantia', 'retorno'];
+const appointmentVisitTypes = ['normal', 'garantia', 'retorno'];
 const turnstileStatuses = ['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue'];
 const pageSize = 50;
 const dashboardMetricTiles = [
