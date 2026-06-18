@@ -58,6 +58,7 @@ const difficultyOptions = [
 const appointmentStatuses = ['agendada', 'realizada', 'cancelada'];
 const appointmentVisitTypes = ['garantia', 'retorno'];
 const turnstileStatuses = ['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue'];
+const pageSize = 50;
 const dashboardMetricTiles = [
   { metric: 'todayAppointments', icon: CalendarDays, label: 'Agendamentos do dia', stat: 'todayAppointments' },
   { metric: 'upcomingAppointments', icon: CalendarDays, label: 'Proximas visitas', stat: 'upcomingAppointments' },
@@ -360,6 +361,24 @@ function ExportButtons({ resource, params = {}, compact = false }) {
   );
 }
 
+function Pagination({ page, total, onPageChange }) {
+  const totalPages = Math.max(1, Math.ceil(Number(total || 0) / pageSize));
+
+  return (
+    <div className="pagination">
+      <button type="button" disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))}>
+        Anterior
+      </button>
+      <span>
+        Pagina {page} de {totalPages}
+      </span>
+      <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(Math.min(totalPages, page + 1))}>
+        Proxima
+      </button>
+    </div>
+  );
+}
+
 function MiniBarChart({ rows = [], keys = ['value'] }) {
   const max = Math.max(1, ...rows.flatMap((row) => keys.map((key) => Number(row[key] || 0))));
 
@@ -573,10 +592,14 @@ export default function App() {
   const [cases, setCases] = useState([]);
   const [caseSearch, setCaseSearch] = useState('');
   const [caseSituation, setCaseSituation] = useState('');
+  const [casesTotal, setCasesTotal] = useState(0);
+  const [casesPage, setCasesPage] = useState(1);
   const [caseForm, setCaseForm] = useState(emptyCase);
   const [editingCaseId, setEditingCaseId] = useState(null);
 
   const [commands, setCommands] = useState([]);
+  const [commandsTotal, setCommandsTotal] = useState(0);
+  const [commandsPage, setCommandsPage] = useState(1);
   const [commandSearch, setCommandSearch] = useState('');
   const [commandForm, setCommandForm] = useState(emptyCommand);
   const [editingCommandId, setEditingCommandId] = useState(null);
@@ -597,6 +620,7 @@ export default function App() {
 
   const [turnstiles, setTurnstiles] = useState([]);
   const [turnstilesTotal, setTurnstilesTotal] = useState(0);
+  const [turnstilesPage, setTurnstilesPage] = useState(1);
   const [turnstilesSearch, setTurnstilesSearch] = useState('');
   const [turnstilesStatus, setTurnstilesStatus] = useState('');
   const [turnstilesStartDate, setTurnstilesStartDate] = useState('');
@@ -607,16 +631,22 @@ export default function App() {
   const [turnstilePhotos, setTurnstilePhotos] = useState([]);
 
   const [systemNotes, setSystemNotes] = useState([]);
+  const [systemNotesTotal, setSystemNotesTotal] = useState(0);
+  const [systemNotesPage, setSystemNotesPage] = useState(1);
   const [systemNotesSearch, setSystemNotesSearch] = useState('');
   const [systemNoteForm, setSystemNoteForm] = useState(emptySystemNote);
   const [editingSystemNoteId, setEditingSystemNoteId] = useState(null);
 
   const [companies, setCompanies] = useState([]);
+  const [companiesTotal, setCompaniesTotal] = useState(0);
+  const [companiesPage, setCompaniesPage] = useState(1);
   const [companiesSearch, setCompaniesSearch] = useState('');
   const [companyForm, setCompanyForm] = useState(emptyCompany);
   const [editingCompanyId, setEditingCompanyId] = useState(null);
 
   const [technicians, setTechnicians] = useState([]);
+  const [techniciansTotal, setTechniciansTotal] = useState(0);
+  const [techniciansPage, setTechniciansPage] = useState(1);
   const [technicianStartDate, setTechnicianStartDate] = useState('');
   const [technicianEndDate, setTechnicianEndDate] = useState('');
   const [technicianHistory, setTechnicianHistory] = useState(null);
@@ -624,6 +654,8 @@ export default function App() {
   const [dailyStartDate, setDailyStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [dailyEndDate, setDailyEndDate] = useState(new Date().toISOString().slice(0, 10));
   const [dailyReport, setDailyReport] = useState([]);
+  const [dailyReportTotal, setDailyReportTotal] = useState(0);
+  const [dailyReportPage, setDailyReportPage] = useState(1);
   const [monthlyReportMonth, setMonthlyReportMonth] = useState(currentMonth());
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [clientHistory, setClientHistory] = useState(null);
@@ -634,8 +666,8 @@ export default function App() {
   );
   const activePeriod = useMemo(() => periods.find((period) => period.status === 'active') || null, [periods]);
   const periodWritable = selectedPeriod?.status === 'active';
-  const totalCorrectivePages = Math.max(1, Math.ceil(correctivesTotal / 50));
-  const totalAppointmentPages = Math.max(1, Math.ceil(appointmentsTotal / 50));
+  const totalCorrectivePages = Math.max(1, Math.ceil(correctivesTotal / pageSize));
+  const totalAppointmentPages = Math.max(1, Math.ceil(appointmentsTotal / pageSize));
 
   const appointmentExportParams = {
     search: appointmentsSearch,
@@ -720,7 +752,7 @@ export default function App() {
     const params = new URLSearchParams({
       periodId: selectedPeriodId,
       page: String(correctivesPage),
-      limit: '50',
+      limit: String(pageSize),
     });
 
     if (correctivesSearch.trim()) {
@@ -733,7 +765,7 @@ export default function App() {
   }, [selectedPeriodId, correctivesPage, correctivesSearch]);
 
   const loadCases = useCallback(async () => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ page: String(casesPage), limit: String(pageSize) });
 
     if (caseSearch.trim()) {
       params.set('search', caseSearch.trim());
@@ -746,15 +778,17 @@ export default function App() {
     const suffix = params.toString() ? `?${params}` : '';
     const data = await request(`/api/cases${suffix}`);
     setCases(data.records);
-  }, [caseSearch, caseSituation]);
+    setCasesTotal(data.total || 0);
+  }, [casesPage, caseSearch, caseSituation]);
 
   const loadCommands = useCallback(async () => {
     if (!selectedPeriodId) {
       setCommands([]);
+      setCommandsTotal(0);
       return;
     }
 
-    const params = new URLSearchParams({ periodId: selectedPeriodId });
+    const params = new URLSearchParams({ periodId: selectedPeriodId, page: String(commandsPage), limit: String(pageSize) });
 
     if (commandSearch.trim()) {
       params.set('search', commandSearch.trim());
@@ -762,10 +796,11 @@ export default function App() {
 
     const data = await request(`/api/commands?${params}`);
     setCommands(data.records);
-  }, [selectedPeriodId, commandSearch]);
+    setCommandsTotal(data.total || 0);
+  }, [selectedPeriodId, commandsPage, commandSearch]);
 
   const loadAppointments = useCallback(async () => {
-    const params = new URLSearchParams({ page: String(appointmentsPage), limit: '50' });
+    const params = new URLSearchParams({ page: String(appointmentsPage), limit: String(pageSize) });
 
     if (appointmentsSearch.trim()) {
       params.set('search', appointmentsSearch.trim());
@@ -804,7 +839,7 @@ export default function App() {
   }, []);
 
   const loadSystemNotes = useCallback(async () => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ page: String(systemNotesPage), limit: String(pageSize) });
 
     if (systemNotesSearch.trim()) {
       params.set('search', systemNotesSearch.trim());
@@ -813,10 +848,11 @@ export default function App() {
     const suffix = params.toString() ? `?${params}` : '';
     const data = await request(`/api/notes${suffix}`);
     setSystemNotes(data.records);
-  }, [systemNotesSearch]);
+    setSystemNotesTotal(data.total || 0);
+  }, [systemNotesPage, systemNotesSearch]);
 
   const loadCompanies = useCallback(async () => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ page: String(companiesPage), limit: String(pageSize) });
 
     if (companiesSearch.trim()) {
       params.set('search', companiesSearch.trim());
@@ -825,10 +861,11 @@ export default function App() {
     const suffix = params.toString() ? `?${params}` : '';
     const data = await request(`/api/companies${suffix}`);
     setCompanies(data.records);
-  }, [companiesSearch]);
+    setCompaniesTotal(data.total || 0);
+  }, [companiesPage, companiesSearch]);
 
   const loadTurnstiles = useCallback(async () => {
-    const params = new URLSearchParams({ limit: '200' });
+    const params = new URLSearchParams({ page: String(turnstilesPage), limit: String(pageSize) });
 
     if (turnstilesSearch.trim()) {
       params.set('search', turnstilesSearch.trim());
@@ -849,7 +886,7 @@ export default function App() {
     const data = await request(`/api/turnstiles?${params}`);
     setTurnstiles(data.records);
     setTurnstilesTotal(data.total);
-  }, [turnstilesSearch, turnstilesStatus, turnstilesStartDate, turnstilesEndDate]);
+  }, [turnstilesPage, turnstilesSearch, turnstilesStatus, turnstilesStartDate, turnstilesEndDate]);
 
   const loadTurnstilePhotos = useCallback(async (id) => {
     if (!id) {
@@ -862,7 +899,7 @@ export default function App() {
   }, []);
 
   const loadTechnicians = useCallback(async () => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ page: String(techniciansPage), limit: String(pageSize) });
 
     if (technicianStartDate) {
       params.set('startDate', technicianStartDate);
@@ -875,13 +912,20 @@ export default function App() {
     const suffix = params.toString() ? `?${params}` : '';
     const data = await request(`/api/technicians${suffix}`);
     setTechnicians(data.records);
-  }, [technicianStartDate, technicianEndDate]);
+    setTechniciansTotal(data.total || 0);
+  }, [techniciansPage, technicianStartDate, technicianEndDate]);
 
   const loadDailyReport = useCallback(async () => {
-    const params = new URLSearchParams({ startDate: dailyStartDate, endDate: dailyEndDate });
+    const params = new URLSearchParams({
+      startDate: dailyStartDate,
+      endDate: dailyEndDate,
+      page: String(dailyReportPage),
+      limit: String(pageSize),
+    });
     const data = await request(`/api/reports/daily?${params}`);
     setDailyReport(data.records);
-  }, [dailyStartDate, dailyEndDate]);
+    setDailyReportTotal(data.total || 0);
+  }, [dailyReportPage, dailyStartDate, dailyEndDate]);
 
   const loadMonthlyReport = useCallback(async () => {
     const data = await request(`/api/reports/monthly?month=${encodeURIComponent(monthlyReportMonth)}`);
@@ -948,6 +992,34 @@ export default function App() {
   useEffect(() => {
     setAppointmentsPage(1);
   }, [appointmentsSearch, appointmentsTechnician, appointmentsVisitType, appointmentsStartDate, appointmentsEndDate]);
+
+  useEffect(() => {
+    setCasesPage(1);
+  }, [caseSearch, caseSituation]);
+
+  useEffect(() => {
+    setCommandsPage(1);
+  }, [commandSearch, selectedPeriodId]);
+
+  useEffect(() => {
+    setSystemNotesPage(1);
+  }, [systemNotesSearch]);
+
+  useEffect(() => {
+    setCompaniesPage(1);
+  }, [companiesSearch]);
+
+  useEffect(() => {
+    setTurnstilesPage(1);
+  }, [turnstilesSearch, turnstilesStatus, turnstilesStartDate, turnstilesEndDate]);
+
+  useEffect(() => {
+    setTechniciansPage(1);
+  }, [technicianStartDate, technicianEndDate]);
+
+  useEffect(() => {
+    setDailyReportPage(1);
+  }, [dailyStartDate, dailyEndDate]);
 
   function updateCorrective(field, value) {
     const normalizedValue = field === 'client'
@@ -1750,6 +1822,7 @@ export default function App() {
                 <Field label="Fim">
                   <input type="date" value={technicianEndDate} onChange={(event) => setTechnicianEndDate(event.target.value)} />
                 </Field>
+                <span className="counter">{techniciansTotal} registros</span>
               </div>
               <div className="table-wrap">
                 <table>
@@ -1782,6 +1855,7 @@ export default function App() {
                 </table>
                 {!technicians.length && <EmptyState label="Nenhum tecnico encontrado." />}
               </div>
+              <Pagination page={techniciansPage} total={techniciansTotal} onPageChange={setTechniciansPage} />
             </div>
 
             <div className="list-panel">
@@ -2353,6 +2427,7 @@ export default function App() {
                 <Field label="Fim">
                   <input type="date" value={dailyEndDate} onChange={(event) => setDailyEndDate(event.target.value)} />
                 </Field>
+                <span className="counter">{dailyReportTotal} registros</span>
               </div>
               <div className="table-wrap compact-table">
                 <table>
@@ -2389,6 +2464,7 @@ export default function App() {
                 </table>
                 {!dailyReport.length && <EmptyState label="Nenhum registro no periodo." />}
               </div>
+              <Pagination page={dailyReportPage} total={dailyReportTotal} onPageChange={setDailyReportPage} />
             </div>
           </section>
 
@@ -2446,6 +2522,7 @@ export default function App() {
                     <option key={situation}>{situation}</option>
                   ))}
                 </select>
+                <span className="counter">{casesTotal} registros</span>
               </div>
               <div className="table-wrap">
                 <table>
@@ -2485,6 +2562,7 @@ export default function App() {
                 </table>
                 {!cases.length && <EmptyState label="Nenhum caso encontrado." />}
               </div>
+              <Pagination page={casesPage} total={casesTotal} onPageChange={setCasesPage} />
             </div>
           </section>
         </section>
@@ -2551,9 +2629,10 @@ export default function App() {
             </div>
             <div className="toolbar">
               <div className="search-box">
-                <Search size={17} />
+              <Search size={17} />
                 <input placeholder="Buscar" value={commandSearch} onChange={(event) => setCommandSearch(event.target.value)} />
               </div>
+              <span className="counter">{commandsTotal} registros</span>
             </div>
             <div className="table-wrap">
               <table>
@@ -2602,6 +2681,7 @@ export default function App() {
               </table>
               {!commands.length && <EmptyState label="Nenhuma comanda encontrada." />}
             </div>
+            <Pagination page={commandsPage} total={commandsTotal} onPageChange={setCommandsPage} />
           </div>
         </section>
       )}
@@ -2656,7 +2736,7 @@ export default function App() {
                   onChange={(event) => setSystemNotesSearch(event.target.value)}
                 />
               </div>
-              <span className="counter">{systemNotes.length} registros</span>
+              <span className="counter">{systemNotesTotal} registros</span>
             </div>
             <div className="table-wrap">
               <table>
@@ -2694,6 +2774,7 @@ export default function App() {
               </table>
               {!systemNotes.length && <EmptyState label="Nenhuma anotacao cadastrada." />}
             </div>
+            <Pagination page={systemNotesPage} total={systemNotesTotal} onPageChange={setSystemNotesPage} />
           </div>
         </section>
       )}
@@ -2768,7 +2849,7 @@ export default function App() {
                   onChange={(event) => setCompaniesSearch(event.target.value)}
                 />
               </div>
-              <span className="counter">{companies.length} registros</span>
+              <span className="counter">{companiesTotal} registros</span>
             </div>
             <div className="table-wrap">
               <table>
@@ -2816,6 +2897,7 @@ export default function App() {
               </table>
               {!companies.length && <EmptyState label="Nenhuma empresa cadastrada." />}
             </div>
+            <Pagination page={companiesPage} total={companiesTotal} onPageChange={setCompaniesPage} />
           </div>
         </section>
       )}
@@ -3031,6 +3113,7 @@ export default function App() {
                 {!turnstiles.length && <EmptyState label="Nenhuma catraca encontrada." />}
               </div>
             )}
+            <Pagination page={turnstilesPage} total={turnstilesTotal} onPageChange={setTurnstilesPage} />
           </div>
         </section>
       )}

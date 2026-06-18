@@ -1115,8 +1115,8 @@ export function createV1Router({ broadcast }) {
       `/${domain}`,
       authGate(readRoles),
       asyncRoute(async (req, res) => {
-        const records = await listRecords(domain, req.query);
-        const payload = { records };
+        const result = await listRecords(domain, req.query);
+        const payload = Array.isArray(result) ? { records: result } : result;
 
         if (domain === 'agendamentos') {
           payload.visitTypeSummary = await appointmentVisitTypeSummary();

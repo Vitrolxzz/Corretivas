@@ -303,6 +303,14 @@ function toDb(body, config) {
 export async function listRecords(resource, options = {}) {
   const config = resourceConfig(resource);
   const limit = Math.min(200, Math.max(1, Number(options.limit || 50)));
+  const page = Math.max(1, Math.trunc(Number(options.page || 1)) || 1);
+  const offset = (page - 1) * limit;
+  const paginated = (records, total) => ({
+    records,
+    total: Number(total || 0),
+    page,
+    limit,
+  });
 
   if (backend() === 'firebase') {
     const db = firestore();
@@ -316,13 +324,13 @@ export async function listRecords(resource, options = {}) {
       }
     }
 
-    const snapshot = await ref.limit(limit).get();
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const snapshot = await ref.get();
+    const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    return paginated(records.slice(offset, offset + limit), records.length);
   }
 
   if (resource === 'clientes') {
-    const { rows } = await query(
-      `SELECT name, MAX(address) AS address, MAX(contact) AS contact, MAX(notes) AS notes
+    const baseSql = `SELECT name, MAX(address) AS address, MAX(contact) AS contact, MAX(notes) AS notes
        FROM (
          SELECT name, address, contact, notes FROM clients WHERE name <> ''
          UNION ALL
@@ -335,11 +343,15 @@ export async function listRecords(resource, options = {}) {
          SELECT client_name AS name, client_address AS address, '' AS contact, notes FROM turnstiles WHERE client_name <> ''
        )
        GROUP BY name
-       ORDER BY name COLLATE NOCASE
-       LIMIT $1`,
-      [limit],
+       ORDER BY name COLLATE NOCASE`;
+    const [total, result] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM (${baseSql}) AS clients_total`),
+      query(`${baseSql} LIMIT $1 OFFSET $2`, [limit, offset]),
+    ]);
+    return paginated(
+      result.rows.map((row) => ({ id: row.name, ...row })),
+      total.rows[0].total,
     );
-    return rows.map((row) => ({ id: row.name, ...row }));
   }
 
   if (resource === 'agendamentos') {
@@ -353,41 +365,50 @@ export async function listRecords(resource, options = {}) {
     }
 
     const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
-    const { rows } = await query(
-      `SELECT appointments.*, (
+    const [total, result] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM appointments ${where}`, params),
+      query(
+        `SELECT appointments.*, (
         SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
        ) AS photo_count
        FROM appointments
        ${where}
        ORDER BY id DESC
-       LIMIT $${params.length + 1}`,
-      [...params, limit],
-    );
-    return rows.map((row) => toApi(row, config));
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset],
+      ),
+    ]);
+    return paginated(result.rows.map((row) => toApi(row, config)), total.rows[0].total);
   }
 
   if (resource === 'catracas') {
-    const { rows } = await query(
-      `SELECT turnstiles.*, (
+    const [total, result] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM turnstiles`),
+      query(
+        `SELECT turnstiles.*, (
         SELECT COUNT(*) FROM turnstile_photos WHERE turnstile_id = turnstiles.id
        ) AS photo_count
        FROM turnstiles
        ORDER BY id DESC
-       LIMIT $1`,
-      [limit],
-    );
-    return rows.map((row) => toApi(row, config));
+       LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      ),
+    ]);
+    return paginated(result.rows.map((row) => toApi(row, config)), total.rows[0].total);
   }
 
   if (resource === 'anotacoes') {
-    const { rows } = await query(
-      `SELECT *
+    const [total, result] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM system_notes`),
+      query(
+        `SELECT *
        FROM system_notes
        ORDER BY updated_at DESC, id DESC
-       LIMIT $1`,
-      [limit],
-    );
-    return rows.map((row) => toApi(row, config));
+       LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      ),
+    ]);
+    return paginated(result.rows.map((row) => toApi(row, config)), total.rows[0].total);
   }
 
   if (resource === 'empresas') {
@@ -404,19 +425,25 @@ export async function listRecords(resource, options = {}) {
     }
 
     const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
-    const { rows } = await query(
-      `SELECT *
+    const [total, result] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM companies ${where}`, params),
+      query(
+        `SELECT *
        FROM companies
        ${where}
        ORDER BY name COLLATE NOCASE, id DESC
-       LIMIT $${params.length + 1}`,
-      [...params, limit],
-    );
-    return rows.map((row) => toApi(row, config));
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset],
+      ),
+    ]);
+    return paginated(result.rows.map((row) => toApi(row, config)), total.rows[0].total);
   }
 
-  const { rows } = await query(`SELECT * FROM ${config.table} ORDER BY id DESC LIMIT $1`, [limit]);
-  return rows.map((row) => toApi(row, config));
+  const [total, result] = await Promise.all([
+    query(`SELECT COUNT(*) AS total FROM ${config.table}`),
+    query(`SELECT * FROM ${config.table} ORDER BY id DESC LIMIT $1 OFFSET $2`, [limit, offset]),
+  ]);
+  return paginated(result.rows.map((row) => toApi(row, config)), total.rows[0].total);
 }
 
 export async function appointmentVisitTypeSummary() {

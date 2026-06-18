@@ -1213,13 +1213,18 @@ class ResourcePage extends StatefulWidget {
 }
 
 class _ResourcePageState extends State<ResourcePage> {
+  static const _pageSize = 50;
   final _queue = OfflineQueue();
   final _search = TextEditingController();
   List<Map<String, dynamic>> _records = [];
   String _visitTypeFilter = '';
   Map<String, dynamic>? _visitTypeSummary;
+  int _page = 1;
+  int _total = 0;
   bool _loading = true;
   String? _error;
+
+  int get _totalPages => max(1, (_total / _pageSize).ceil());
 
   @override
   void initState() {
@@ -1237,18 +1242,24 @@ class _ResourcePageState extends State<ResourcePage> {
           widget.resource != 'agendamentos') {
         _visitTypeFilter = '';
       }
+      _page = 1;
       _load();
     }
   }
 
-  Future<void> _load() async {
+  Future<void> _load({int? page}) async {
+    final requestedPage = page ?? _page;
     setState(() {
       _loading = true;
       _error = null;
+      _page = requestedPage;
     });
 
     try {
-      final params = <String, String>{};
+      final params = <String, String>{
+        'page': requestedPage.toString(),
+        'limit': _pageSize.toString(),
+      };
 
       if (widget.resource == 'agendamentos' && _visitTypeFilter.isNotEmpty) {
         params['visitType'] = _visitTypeFilter;
@@ -1271,6 +1282,9 @@ class _ResourcePageState extends State<ResourcePage> {
       if (!mounted) return;
       setState(() {
         _records = records;
+        _total = data.containsKey('total')
+            ? numberValue(data['total']).round()
+            : records.length;
         _visitTypeSummary = widget.resource == 'agendamentos' ? summary : null;
       });
     } catch (error) {
@@ -1418,11 +1432,11 @@ class _ResourcePageState extends State<ResourcePage> {
                 prefixIcon: Icon(Icons.search_rounded), labelText: 'Buscar'),
             onChanged: (_) {
               if (widget.resource == 'empresas') {
-                _load();
+                _load(page: 1);
                 return;
               }
 
-              setState(() {});
+              setState(() => _page = 1);
             },
           ),
           if (widget.resource == 'agendamentos') ...[
@@ -1437,7 +1451,7 @@ class _ResourcePageState extends State<ResourcePage> {
               ],
               onChanged: (value) {
                 setState(() => _visitTypeFilter = value ?? '');
-                _load();
+                _load(page: 1);
               },
             ),
           ],
@@ -1452,7 +1466,7 @@ class _ResourcePageState extends State<ResourcePage> {
                 padding: const EdgeInsets.all(16),
                 child: Text(_error!,
                     style: const TextStyle(color: CorretivasTheme.danger)))
-          else
+          else ...[
             ..._filtered.map((record) => Card(
                   child: ListTile(
                     onTap: () => _openDetail(record),
@@ -1481,6 +1495,63 @@ class _ResourcePageState extends State<ResourcePage> {
                     ),
                   ),
                 )),
+            _MobilePaginationControls(
+              page: _page,
+              totalPages: _totalPages,
+              total: _total,
+              onPrevious: _page <= 1 ? null : () => _load(page: _page - 1),
+              onNext:
+                  _page >= _totalPages ? null : () => _load(page: _page + 1),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MobilePaginationControls extends StatelessWidget {
+  const _MobilePaginationControls({
+    required this.page,
+    required this.totalPages,
+    required this.total,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int page;
+  final int totalPages;
+  final int total;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: onPrevious,
+              child: const Text('Anterior'),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              'Pagina $page de $totalPages\n$total registros',
+              textAlign: TextAlign.center,
+              style:
+                  const TextStyle(color: CorretivasTheme.muted, fontSize: 12),
+            ),
+          ),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: onNext,
+              child: const Text('Proxima'),
+            ),
+          ),
         ],
       ),
     );

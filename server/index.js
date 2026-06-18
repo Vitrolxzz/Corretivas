@@ -1347,6 +1347,9 @@ app.get(
 app.get(
   '/api/notes',
   asyncRoute(async (req, res) => {
+    const page = pageFromQuery(req.query.page);
+    const limit = limitFromQuery(req.query.limit);
+    const offset = (page - 1) * limit;
     const params = [];
     const whereParts = [];
     const search = cleanText(req.query.search);
@@ -1361,16 +1364,22 @@ app.get(
     }
 
     const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const total = await query(`SELECT COUNT(*) AS total FROM system_notes ${where}`, params);
     const { rows } = await query(
       `SELECT *
        FROM system_notes
        ${where}
        ORDER BY updated_at DESC, id DESC
-       LIMIT 200`,
-      params,
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
     );
 
-    res.json({ records: rows.map(systemNoteToJson) });
+    res.json({
+      records: rows.map(systemNoteToJson),
+      total: Number(total.rows[0].total || 0),
+      page,
+      limit,
+    });
   }),
 );
 
@@ -1448,6 +1457,9 @@ app.delete(
 app.get(
   '/api/companies',
   asyncRoute(async (req, res) => {
+    const page = pageFromQuery(req.query.page);
+    const limit = limitFromQuery(req.query.limit);
+    const offset = (page - 1) * limit;
     const params = [];
     const whereParts = [];
     const search = cleanText(req.query.search);
@@ -1461,16 +1473,22 @@ app.get(
     }
 
     const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const total = await query(`SELECT COUNT(*) AS total FROM companies ${where}`, params);
     const { rows } = await query(
       `SELECT *
        FROM companies
        ${where}
        ORDER BY name COLLATE NOCASE, id DESC
-       LIMIT 500`,
-      params,
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
     );
 
-    res.json({ records: rows.map(companyToJson) });
+    res.json({
+      records: rows.map(companyToJson),
+      total: Number(total.rows[0].total || 0),
+      page,
+      limit,
+    });
   }),
 );
 
@@ -2078,6 +2096,9 @@ app.delete(
 app.get(
   '/api/cases',
   asyncRoute(async (req, res) => {
+    const page = pageFromQuery(req.query.page);
+    const limit = limitFromQuery(req.query.limit);
+    const offset = (page - 1) * limit;
     const params = [];
     const whereParts = [];
     const search = cleanText(req.query.search);
@@ -2099,6 +2120,7 @@ app.get(
     }
 
     const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const total = await query(`SELECT COUNT(*) AS total FROM case_monitors ${where}`, params);
     const { rows } = await query(
       `SELECT *
        FROM case_monitors
@@ -2111,11 +2133,17 @@ app.get(
           ELSE 4
         END,
         COALESCE(start_date, '0001-01-01') DESC,
-        id DESC`,
-      params,
+        id DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
     );
 
-    res.json({ records: rows.map(caseToJson) });
+    res.json({
+      records: rows.map(caseToJson),
+      total: Number(total.rows[0].total || 0),
+      page,
+      limit,
+    });
   }),
 );
 
@@ -2188,9 +2216,12 @@ app.get(
   '/api/commands',
   asyncRoute(async (req, res) => {
     const period = await getPeriodByIdOrActive(req.query.periodId);
+    const page = pageFromQuery(req.query.page);
+    const limit = limitFromQuery(req.query.limit);
+    const offset = (page - 1) * limit;
 
     if (!period) {
-      res.json({ period: null, records: [] });
+      res.json({ period: null, records: [], total: 0, page: 1, limit: 50 });
       return;
     }
 
@@ -2210,16 +2241,23 @@ app.get(
       )`;
     }
 
+    const total = await query(`SELECT COUNT(*) AS total FROM command_registrations WHERE ${where}`, params);
     const { rows } = await query(
       `SELECT *
        FROM command_registrations
        WHERE ${where}
        ORDER BY id DESC
-       LIMIT 200`,
-      params,
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
     );
 
-    res.json({ period: periodToJson(period), records: rows.map(commandToJson) });
+    res.json({
+      period: periodToJson(period),
+      records: rows.map(commandToJson),
+      total: Number(total.rows[0].total || 0),
+      page,
+      limit,
+    });
   }),
 );
 
@@ -2310,7 +2348,7 @@ app.get(
   '/api/turnstiles',
   asyncRoute(async (req, res) => {
     const page = pageFromQuery(req.query.page);
-    const limit = limitFromQuery(req.query.limit, 100);
+    const limit = limitFromQuery(req.query.limit);
     const offset = (page - 1) * limit;
     const params = [];
     const whereParts = [];
@@ -2934,6 +2972,9 @@ app.get(
 app.get(
   '/api/technicians',
   asyncRoute(async (req, res) => {
+    const page = pageFromQuery(req.query.page);
+    const limit = limitFromQuery(req.query.limit);
+    const offset = (page - 1) * limit;
     const { startDate, endDate } = dateFiltersFromQuery(req.query);
     const appointmentParams = [];
     const appointmentWhere = [`technician <> ''`];
@@ -2974,8 +3015,7 @@ app.get(
       WHERE ${correctiveWhere.join(' AND ')}
       GROUP BY technician`;
 
-    const { rows } = await query(
-      `SELECT name,
+    const aggregateSql = `SELECT name,
         SUM(visits_done) AS visits_done,
         SUM(correctives_done) AS correctives_done,
         SUM(appointments) AS appointments,
@@ -2987,13 +3027,19 @@ app.get(
         ${correctiveSql}
        )
        WHERE name <> ''
-       GROUP BY name
-       ORDER BY visits_done DESC, correctives_done DESC, name ASC`,
-      appointmentParams,
-    );
+       GROUP BY name`;
+    const [total, result] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM (${aggregateSql}) AS technicians_total`, appointmentParams),
+      query(
+        `${aggregateSql}
+       ORDER BY visits_done DESC, correctives_done DESC, name ASC
+       LIMIT $${appointmentParams.length + 1} OFFSET $${appointmentParams.length + 2}`,
+        [...appointmentParams, limit, offset],
+      ),
+    ]);
 
     res.json({
-      records: rows.map((row) => ({
+      records: result.rows.map((row) => ({
         name: row.name,
         visitsDone: Number(row.visits_done || 0),
         correctivesDone: Number(row.correctives_done || 0),
@@ -3001,6 +3047,9 @@ app.get(
         visitTotal: Number(row.visit_total || 0),
         partsTotal: Number(row.parts_total || 0),
       })),
+      total: Number(total.rows[0].total || 0),
+      page,
+      limit,
     });
   }),
 );
@@ -3080,30 +3129,40 @@ app.get(
 app.get(
   '/api/reports/daily',
   asyncRoute(async (req, res) => {
+    const page = pageFromQuery(req.query.page);
+    const limit = limitFromQuery(req.query.limit);
+    const offset = (page - 1) * limit;
     const { startDate, endDate } = dateFiltersFromQuery(req.query);
     const start = startDate || todayText();
     const end = endDate || start;
-    const [correctives, appointments] = await Promise.all([
-      query(
-        `SELECT client AS client, technician, occurrence_date AS date, reason AS problem,
+    const params = [start, end, start, end];
+    const reportSql = `SELECT client AS client, technician, occurrence_date AS date, reason AS problem,
           CASE WHEN solution_date IS NOT NULL AND solution_date <> '' THEN 'concluida' ELSE 'aberta' END AS status,
           0 AS visit_value, 0 AS parts_value, 'Ocorrencia' AS source
          FROM corrective_occurrences
          WHERE occurrence_date >= $1 AND occurrence_date <= $2
-         ORDER BY occurrence_date DESC, id DESC`,
-        [start, end],
-      ),
-      query(
-        `SELECT client_name AS client, technician, visit_date AS date, reported_problem AS problem,
+         UNION ALL
+         SELECT client_name AS client, technician, visit_date AS date, reported_problem AS problem,
           status, visit_value, parts_value, 'Agendamento' AS source
          FROM appointments
-         WHERE visit_date >= $1 AND visit_date <= $2
-         ORDER BY visit_date DESC, id DESC`,
-        [start, end],
+         WHERE visit_date >= $3 AND visit_date <= $4`;
+    const [total, records] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM (${reportSql}) AS daily_report_total`, params),
+      query(
+        `SELECT *
+         FROM (${reportSql}) AS daily_report
+         ORDER BY date DESC, source ASC
+         LIMIT $5 OFFSET $6`,
+        [...params, limit, offset],
       ),
     ]);
 
-    res.json({ records: [...correctives.rows, ...appointments.rows] });
+    res.json({
+      records: records.rows,
+      total: Number(total.rows[0].total || 0),
+      page,
+      limit,
+    });
   }),
 );
 
