@@ -1673,29 +1673,33 @@ export default function App() {
             </section>
           )}
 
-          <section className="workspace two-column dashboard-grid">
-            <div className="list-panel">
-              <div className="section-title">
-                <h2>Atendimentos por cliente no mes</h2>
-                <PieChart size={18} />
+          <section className="workspace dashboard-chart-grid">
+            <div className="dashboard-chart-column">
+              <div className="list-panel">
+                <div className="section-title">
+                  <h2>Atendimentos por cliente no mes</h2>
+                  <PieChart size={18} />
+                </div>
+                <DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
               </div>
-              <DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
             </div>
 
-            <div className="list-panel">
-              <div className="section-title">
-                <h2>Visitas por tipo</h2>
-                <PieChart size={18} />
+            <div className="dashboard-chart-column">
+              <div className="list-panel">
+                <div className="section-title">
+                  <h2>Visitas por tipo</h2>
+                  <PieChart size={18} />
+                </div>
+                <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
               </div>
-              <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
-            </div>
 
-            <div className="list-panel">
-              <div className="section-title">
-                <h2>Atividade operacional</h2>
-                <BarChart3 size={18} />
+              <div className="list-panel">
+                <div className="section-title">
+                  <h2>Atividade operacional</h2>
+                  <BarChart3 size={18} />
+                </div>
+                <MiniBarChart rows={dashboard?.charts?.monthlyActivity || []} keys={['correctives', 'appointments']} />
               </div>
-              <MiniBarChart rows={dashboard?.charts?.monthlyActivity || []} keys={['correctives', 'appointments']} />
             </div>
           </section>
 
