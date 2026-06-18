@@ -759,6 +759,20 @@ function appointmentVisitTypeSummaryFromRow(row) {
   };
 }
 
+function appointmentVisitTypeChartFromRow(row) {
+  const total = Number(row?.total || 0);
+  const garantia = Number(row?.garantia || 0);
+  const retorno = Number(row?.retorno || 0);
+  const semTipo = Math.max(0, total - garantia - retorno);
+  const percent = (value) => (total ? Math.round((Number(value || 0) / total) * 100) : 0);
+
+  return [
+    { label: 'Garantia', value: garantia, percent: percent(garantia) },
+    { label: 'Retorno', value: retorno, percent: percent(retorno) },
+    { label: 'Sem tipo', value: semTipo, percent: percent(semTipo) },
+  ].filter((rowItem) => rowItem.value > 0);
+}
+
 async function optimizeImage(buffer) {
   const image = sharp(buffer, { failOn: 'warning' }).rotate();
   const optimized = await image
@@ -1163,6 +1177,7 @@ app.get(
       turnstileStatus,
       attendanceByClient,
       monthlyActivity,
+      visitTypeShare,
     ] = await Promise.all([
       query('SELECT COUNT(*) AS total FROM corrective_occurrences WHERE period_id = $1', [period.id]),
       query('SELECT COUNT(*) AS total FROM command_registrations WHERE period_id = $1', [period.id]),
@@ -1263,6 +1278,13 @@ app.get(
          LIMIT 6`,
         [period.id],
       ),
+      query(
+        `SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN visit_type = 'garantia' THEN 1 ELSE 0 END) AS garantia,
+          SUM(CASE WHEN visit_type = 'retorno' THEN 1 ELSE 0 END) AS retorno
+         FROM appointments`,
+      ),
     ]);
 
     const completedInMonth = Number(completedCorrectivesMonth.rows[0].total || 0);
@@ -1305,6 +1327,7 @@ app.get(
             appointments: Number(row.appointments || 0),
           }))
           .reverse(),
+        visitTypeShare: appointmentVisitTypeChartFromRow(visitTypeShare.rows[0]),
       },
     });
   }),

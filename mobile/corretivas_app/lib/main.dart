@@ -606,6 +606,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 rows: listOfMaps(charts['attendanceByClient'])),
           ),
           _DashboardSection(
+            title: 'Visitas por tipo',
+            icon: Icons.pie_chart_rounded,
+            child: _DashboardDonutChart(
+                rows: listOfMaps(charts['visitTypeShare'])),
+          ),
+          _DashboardSection(
             title: 'Atividade operacional',
             icon: Icons.bar_chart_rounded,
             child:

@@ -1684,6 +1684,14 @@ export default function App() {
 
             <div className="list-panel">
               <div className="section-title">
+                <h2>Visitas por tipo</h2>
+                <PieChart size={18} />
+              </div>
+              <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
+            </div>
+
+            <div className="list-panel">
+              <div className="section-title">
                 <h2>Atividade operacional</h2>
                 <BarChart3 size={18} />
               </div>
