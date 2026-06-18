@@ -1,4 +1,15 @@
-const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+const railwayApiBase = 'https://corretivas.up.railway.app';
+const firebaseHostSuffixes = ['web.app', 'firebaseapp.com'];
+
+function defaultApiBase() {
+  if (typeof window !== 'undefined' && firebaseHostSuffixes.some((suffix) => window.location.hostname.endsWith(suffix))) {
+    return railwayApiBase;
+  }
+
+  return '';
+}
+
+const apiBase = import.meta.env.VITE_API_BASE_URL || defaultApiBase();
 
 async function parseResponse(response) {
   if (response.status === 204) {
