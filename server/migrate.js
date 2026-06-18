@@ -446,6 +446,7 @@ export async function migrate() {
   await ensureColumn('appointments', 'notes', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'annotations', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'visit_type', "TEXT NOT NULL DEFAULT ''");
+  await query(`UPDATE appointments SET visit_time = NULL WHERE visit_time IS NOT NULL AND visit_time <> ''`);
   await query(
     `CREATE INDEX IF NOT EXISTS appointment_visit_type_idx
      ON appointments (visit_type, visit_date DESC, id DESC)`,

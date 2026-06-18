@@ -62,7 +62,6 @@ const resources = {
       annotations: 'annotations',
       visitType: 'visit_type',
       visitDate: 'visit_date',
-      visitTime: 'visit_time',
       technician: 'technician',
       visitValue: 'visit_value',
       partsValue: 'parts_value',
@@ -368,7 +367,7 @@ export async function listRecords(resource, options = {}) {
     const [total, result] = await Promise.all([
       query(`SELECT COUNT(*) AS total FROM appointments ${where}`, params),
       query(
-        `SELECT appointments.*, (
+        `SELECT appointments.*, 0 AS conflict_count, (
         SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
        ) AS photo_count
        FROM appointments

@@ -277,22 +277,6 @@ function cleanCaseSituation(value) {
   return normalized;
 }
 
-function cleanTime(value) {
-  const text = cleanText(value);
-
-  if (!text) {
-    return null;
-  }
-
-  if (!/^\d{2}:\d{2}$/.test(text)) {
-    const error = new Error('Horario invalido. Use o formato HH:MM.');
-    error.status = 400;
-    throw error;
-  }
-
-  return text;
-}
-
 function cleanMoney(value) {
   if (value === null || value === undefined || value === '') {
     return 0;
@@ -515,7 +499,6 @@ function appointmentToJson(row) {
     annotations: row.annotations,
     visitType: row.visit_type,
     visitDate: dateToJson(row.visit_date),
-    visitTime: row.visit_time,
     technician: row.technician,
     visitValue: Number(row.visit_value || 0),
     partsValue: Number(row.parts_value || 0),
@@ -674,7 +657,6 @@ function appointmentPayload(body) {
     annotations: cleanText(body.annotations),
     visitType: cleanAppointmentVisitType(body.visitType),
     visitDate: cleanDate(body.visitDate),
-    visitTime: cleanTime(body.visitTime),
     technician: normalizeTechnicianName(body.technician),
     visitValue: cleanMoney(body.visitValue),
     partsValue: cleanMoney(body.partsValue),
@@ -1194,18 +1176,10 @@ app.get(
       ),
       query(`SELECT COUNT(*) AS total FROM appointments WHERE visit_date = $1 AND status <> 'cancelada'`, [today]),
       query(
-        `SELECT *, (
-          SELECT COUNT(*)
-          FROM appointments same
-          WHERE same.id <> appointments.id
-            AND same.visit_date = appointments.visit_date
-            AND COALESCE(same.visit_time, '') = COALESCE(appointments.visit_time, '')
-            AND same.technician = appointments.technician
-            AND same.status <> 'cancelada'
-        ) AS conflict_count
+        `SELECT *, 0 AS conflict_count
          FROM appointments
          WHERE visit_date >= $1 AND status <> 'cancelada'
-         ORDER BY visit_date ASC, COALESCE(visit_time, '') ASC, id ASC
+         ORDER BY visit_date ASC, id ASC
          LIMIT 8`,
         [today],
       ),
@@ -1653,21 +1627,12 @@ app.get(
       ),
     ]);
     const rows = await query(
-      `SELECT appointments.*, (
-        SELECT COUNT(*)
-        FROM appointments same
-        WHERE same.id <> appointments.id
-          AND same.visit_date = appointments.visit_date
-          AND COALESCE(same.visit_time, '') = COALESCE(appointments.visit_time, '')
-          AND same.technician = appointments.technician
-          AND same.status <> 'cancelada'
-          AND appointments.status <> 'cancelada'
-      ) AS conflict_count, (
+      `SELECT appointments.*, 0 AS conflict_count, (
         SELECT COUNT(*) FROM appointment_photos WHERE appointment_id = appointments.id
       ) AS photo_count
        FROM appointments
        WHERE ${where}
-       ORDER BY COALESCE(visit_date, '0001-01-01') DESC, COALESCE(visit_time, '') DESC, id DESC
+       ORDER BY COALESCE(visit_date, '0001-01-01') DESC, id DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset],
     );
@@ -1747,7 +1712,7 @@ app.post(
         client_name, address, reported_problem, notes, annotations, visit_type,
         visit_date, visit_time, technician, visit_value, parts_value, status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10, $11)
       RETURNING *`,
       [
         payload.clientName,
@@ -1757,7 +1722,6 @@ app.post(
         payload.annotations,
         payload.visitType,
         payload.visitDate,
-        payload.visitTime,
         payload.technician,
         payload.visitValue,
         payload.partsValue,
@@ -1786,11 +1750,11 @@ app.put(
            annotations = $6,
            visit_type = $7,
            visit_date = $8,
-           visit_time = $9,
-           technician = $10,
-           visit_value = $11,
-           parts_value = $12,
-           status = $13
+           visit_time = NULL,
+           technician = $9,
+           visit_value = $10,
+           parts_value = $11,
+           status = $12
        WHERE id = $1
        RETURNING *`,
       [
@@ -1802,7 +1766,6 @@ app.put(
         payload.annotations,
         payload.visitType,
         payload.visitDate,
-        payload.visitTime,
         payload.technician,
         payload.visitValue,
         payload.partsValue,
@@ -1825,14 +1788,13 @@ app.patch(
   '/api/appointments/:id/date',
   asyncRoute(async (req, res) => {
     const visitDate = cleanDate(req.body?.visitDate);
-    const visitTime = cleanTime(req.body?.visitTime);
     const updated = await query(
       `UPDATE appointments
        SET visit_date = $2,
-           visit_time = COALESCE($3, visit_time)
+           visit_time = NULL
        WHERE id = $1
        RETURNING *`,
-      [Number(req.params.id), visitDate, visitTime],
+      [Number(req.params.id), visitDate],
     );
 
     if (!updated.rows[0]) {
@@ -3254,8 +3216,8 @@ app.get(
         query(
           `SELECT id, client_name, technician, visit_date
            FROM appointments
-           WHERE visit_date = $1 AND status = 'agendada'
-           ORDER BY COALESCE(visit_time, '') ASC, id ASC
+         WHERE visit_date = $1 AND status = 'agendada'
+           ORDER BY id ASC
            LIMIT 20`,
           [today],
         ),
@@ -3517,7 +3479,7 @@ app.get(
         `SELECT *
          FROM appointments
          WHERE ${where}
-         ORDER BY COALESCE(visit_date, '9999-12-31') ASC, COALESCE(visit_time, '') ASC, id DESC`,
+         ORDER BY COALESCE(visit_date, '9999-12-31') ASC, id DESC`,
         params,
       );
       const columns = [
@@ -3527,7 +3489,6 @@ app.get(
         ['Observacoes', 'notes'],
         ['Tipo visita', 'visit_type'],
         ['Data', 'visit_date'],
-        ['Horario', 'visit_time'],
         ['Tecnico', 'technician'],
         ['Valor visita', (row) => formatCurrency(row.visit_value)],
         ['Valor pecas', (row) => formatCurrency(row.parts_value)],

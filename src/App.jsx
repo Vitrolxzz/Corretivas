@@ -108,7 +108,6 @@ const emptyAppointment = {
   annotations: '',
   visitType: '',
   visitDate: '',
-  visitTime: '',
   technician: '',
   visitValue: '',
   partsValue: '',
@@ -697,9 +696,8 @@ export default function App() {
         .filter((record) => record.visitDate)
         .map((record) => ({
           id: String(record.id),
-          title: `${record.visitTime || ''} ${record.clientName}`.trim(),
-          start: record.visitTime ? `${record.visitDate}T${record.visitTime}:00` : record.visitDate,
-          classNames: record.conflictCount > 0 ? ['event-conflict'] : [],
+          title: record.clientName,
+          start: record.visitDate,
           extendedProps: { record },
         })),
     [appointments],
@@ -1149,7 +1147,6 @@ export default function App() {
           annotations: data.record.annotations,
           visitType: data.record.visitType,
           visitDate: data.record.visitDate,
-          visitTime: data.record.visitTime,
           technician: data.record.technician,
           visitValue: data.record.visitValue,
           partsValue: data.record.partsValue,
@@ -1316,7 +1313,6 @@ export default function App() {
         annotations: record.annotations,
         visitType: record.visitType,
         visitDate: record.visitDate,
-        visitTime: record.visitTime,
         technician: record.technician,
         visitValue: record.visitValue,
         partsValue: record.partsValue,
@@ -1485,12 +1481,11 @@ export default function App() {
     const record = info.event.extendedProps.record;
     const start = info.event.start;
     const visitDate = start?.toISOString().slice(0, 10);
-    const visitTime = start && !info.event.allDay ? start.toTimeString().slice(0, 5) : record.visitTime;
 
     try {
       await request(`/api/appointments/${record.id}/date`, {
         method: 'PATCH',
-        body: { visitDate, visitTime },
+        body: { visitDate },
       });
       await Promise.all([loadAppointments(), refreshOperationalData()]);
       showToast('Agendamento remarcado.');
@@ -1785,7 +1780,7 @@ export default function App() {
                   <button key={record.id} type="button" onClick={() => editAppointment(record)}>
                     <strong>{record.clientName}</strong>
                     <span>
-                      {formatDate(record.visitDate)} {record.visitTime || ''} - {record.technician || 'Sem tecnico'}
+                      {formatDate(record.visitDate)} - {record.technician || 'Sem tecnico'}
                     </span>
                   </button>
                 ))}
@@ -1927,19 +1922,12 @@ export default function App() {
               <Field label="Observacoes">
                 <textarea rows="3" value={appointmentForm.notes} onChange={(event) => updateAppointment('notes', event.target.value)} />
               </Field>
-              <div className="form-grid two-fields">
+              <div className="form-grid single-column">
                 <Field label="Data da visita">
                   <input
                     type="date"
                     value={appointmentForm.visitDate}
                     onChange={(event) => updateAppointment('visitDate', event.target.value)}
-                  />
-                </Field>
-                <Field label="Horario">
-                  <input
-                    type="time"
-                    value={appointmentForm.visitTime}
-                    onChange={(event) => updateAppointment('visitTime', event.target.value)}
                   />
                 </Field>
               </div>
@@ -2118,8 +2106,6 @@ export default function App() {
                         <tr key={record.id}>
                           <td>
                             {formatDate(record.visitDate)}
-                            {record.visitTime ? ` ${record.visitTime}` : ''}
-                            {record.conflictCount > 0 && <StatusPill value="Conflito" />}
                           </td>
                           <td>
                             <button className="text-link" type="button" onClick={() => openClientHistory(record.clientName)}>

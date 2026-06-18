@@ -1117,7 +1117,7 @@ class _UpcomingAppointmentTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         title: Text(record['clientName']?.toString() ?? 'Cliente'),
         subtitle: Text(
-          '${formatDateText(record['visitDate'])} ${record['visitTime'] ?? ''}\n${record['technician']?.toString().isNotEmpty == true ? record['technician'] : 'Sem tecnico'}',
+          '${formatDateText(record['visitDate'])}\n${record['technician']?.toString().isNotEmpty == true ? record['technician'] : 'Sem tecnico'}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
@@ -2552,7 +2552,6 @@ List<String> editorFields(String resource) {
         'reportedProblem',
         'notes',
         'visitDate',
-        'visitTime',
         'technician',
         'visitValue',
         'partsValue',
@@ -2615,7 +2614,7 @@ const appointmentVisitTypeOptions = ['normal', 'garantia', 'retorno'];
 
 dynamic editorValue(String resource, String key, String value) {
   final text = value.trim();
-  final nullableFields = {...dateFieldKeys, 'visitTime'};
+  final nullableFields = {...dateFieldKeys};
 
   if (isClientField(resource, key)) {
     return text.toUpperCase();
@@ -2736,7 +2735,6 @@ String fieldLabel(String key) {
     'clientName': 'Cliente',
     'reportedProblem': 'Problema relatado',
     'visitDate': 'Data da visita',
-    'visitTime': 'Horario',
     'visitValue': 'Valor da visita',
     'partsValue': 'Valor das pecas',
     'visitType': 'Tipo visita',

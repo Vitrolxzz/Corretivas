@@ -178,7 +178,6 @@ function appointmentToJson(row) {
     annotations: row.annotations,
     visitType: row.visit_type,
     visitDate: dateToJson(row.visit_date),
-    visitTime: row.visit_time,
     technician: row.technician,
     visitValue: Number(row.visit_value || 0),
     partsValue: Number(row.parts_value || 0),
@@ -403,18 +402,10 @@ export function createV1Router({ broadcast }) {
         ),
         query(`SELECT COUNT(*) AS total FROM appointments WHERE visit_date = $1 AND status <> 'cancelada'`, [today]),
         query(
-          `SELECT *, (
-            SELECT COUNT(*)
-            FROM appointments same
-            WHERE same.id <> appointments.id
-              AND same.visit_date = appointments.visit_date
-              AND COALESCE(same.visit_time, '') = COALESCE(appointments.visit_time, '')
-              AND same.technician = appointments.technician
-              AND same.status <> 'cancelada'
-          ) AS conflict_count
+          `SELECT *, 0 AS conflict_count
            FROM appointments
            WHERE visit_date >= $1 AND status <> 'cancelada'
-           ORDER BY visit_date ASC, COALESCE(visit_time, '') ASC, id ASC
+           ORDER BY visit_date ASC, id ASC
            LIMIT 8`,
           [today],
         ),
@@ -1053,7 +1044,7 @@ export function createV1Router({ broadcast }) {
           `SELECT id, client_name, technician, visit_date
            FROM appointments
            WHERE visit_date = $1 AND status = 'agendada'
-           ORDER BY COALESCE(visit_time, '') ASC, id ASC
+           ORDER BY id ASC
            LIMIT 20`,
           [today],
         ),
