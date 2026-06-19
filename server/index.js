@@ -51,6 +51,7 @@ const healthOptions = new Set(['Ok', 'Nulo']);
 const appointmentStatuses = new Set(['agendada', 'realizada', 'cancelada']);
 const appointmentVisitTypes = new Set(['normal', 'garantia', 'retorno']);
 const turnstileStatuses = new Set(['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue']);
+const systemNoteAuthors = new Set(['Valquíria', 'Thiago', 'Lucas', 'Rubens', 'Vittor', 'Daniel A.', 'Daniel']);
 const caseSituations = new Set(['com problema', 'em observação', 'em testes', 'ok']);
 
 mkdirSync(uploadDir, { recursive: true });
@@ -675,6 +676,11 @@ function turnstilePayload(body) {
   };
 }
 
+function cleanSystemNoteAuthor(value) {
+  const author = cleanText(value);
+  return systemNoteAuthors.has(author) ? author : 'Valquíria';
+}
+
 function systemNotePayload(body) {
   const title = cleanText(body.title);
   const content = cleanText(body.content);
@@ -688,7 +694,7 @@ function systemNotePayload(body) {
   return {
     title,
     content,
-    createdBy: cleanText(body.createdBy) || 'Sistema web',
+    createdBy: cleanSystemNoteAuthor(body.createdBy),
   };
 }
 

@@ -58,6 +58,7 @@ const difficultyOptions = [
 const appointmentStatuses = ['agendada', 'realizada', 'cancelada'];
 const appointmentVisitTypes = ['normal', 'garantia', 'retorno'];
 const turnstileStatuses = ['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue'];
+const systemNoteAuthors = ['Valquíria', 'Thiago', 'Lucas', 'Rubens', 'Vittor', 'Daniel A.', 'Daniel'];
 const pageSize = 50;
 const dashboardMetricTiles = [
   { metric: 'todayAppointments', icon: CalendarDays, label: 'Agendamentos do dia', stat: 'todayAppointments' },
@@ -126,6 +127,7 @@ const emptyTurnstile = {
 const emptySystemNote = {
   title: '',
   content: '',
+  createdBy: systemNoteAuthors[0],
 };
 
 const emptyCompany = {
@@ -1347,6 +1349,7 @@ export default function App() {
       normalizeForForm({
         title: record.title,
         content: record.content,
+        createdBy: systemNoteAuthors.includes(record.createdBy) ? record.createdBy : systemNoteAuthors[0],
       }),
     );
     setActiveTab('notes');
@@ -2692,6 +2695,15 @@ export default function App() {
             <div className="form-grid single-column">
               <Field label="Titulo">
                 <input value={systemNoteForm.title} onChange={(event) => updateSystemNote('title', event.target.value)} />
+              </Field>
+              <Field label="Criado por">
+                <select value={systemNoteForm.createdBy} onChange={(event) => updateSystemNote('createdBy', event.target.value)}>
+                  {systemNoteAuthors.map((author) => (
+                    <option key={author} value={author}>
+                      {author}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Anotacao">
                 <textarea
