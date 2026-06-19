@@ -2515,7 +2515,13 @@ List<String> detailFields(String resource, Map<String, dynamic> record) {
 Set<String> hiddenDetailFields(String resource) {
   return switch (resource) {
     'ocorrencias' => {'periodId', 'sourceHash'},
-    'agendamentos' => {'photoCount', 'photo_count', 'annotations'},
+    'agendamentos' => {
+        'photoCount',
+        'photo_count',
+        'annotations',
+        'visitTime',
+        'visit_time',
+      },
     'catracas' => {'photoCount', 'photo_count'},
     _ => const <String>{},
   };
