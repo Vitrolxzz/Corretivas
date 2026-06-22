@@ -58,7 +58,7 @@ const schema = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     period_id INTEGER NOT NULL REFERENCES periods(id) ON DELETE RESTRICT,
     bakery TEXT NOT NULL DEFAULT '',
-    quantity INTEGER NOT NULL DEFAULT 1,
+    quantity INTEGER,
     dm_conf TEXT NOT NULL DEFAULT '',
     dm_cad TEXT NOT NULL DEFAULT '',
     dm_imp TEXT NOT NULL DEFAULT '',
@@ -344,6 +344,55 @@ async function ensureColumn(table, column, definition) {
   }
 }
 
+async function ensureCommandQuantityNullable() {
+  const info = await query(`PRAGMA table_info(command_registrations)`);
+  const quantity = info.rows.find((row) => row.name === 'quantity');
+
+  if (!quantity) {
+    await query(`ALTER TABLE command_registrations ADD COLUMN quantity INTEGER`);
+    return;
+  }
+
+  if (Number(quantity.notnull || 0) === 0 && (quantity.dflt_value === null || quantity.dflt_value === undefined)) {
+    return;
+  }
+
+  await query(`ALTER TABLE command_registrations RENAME TO command_registrations_quantity_old`);
+  await query(
+    `CREATE TABLE command_registrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      period_id INTEGER NOT NULL REFERENCES periods(id) ON DELETE RESTRICT,
+      bakery TEXT NOT NULL DEFAULT '',
+      quantity INTEGER,
+      dm_conf TEXT NOT NULL DEFAULT '',
+      dm_cad TEXT NOT NULL DEFAULT '',
+      dm_imp TEXT NOT NULL DEFAULT '',
+      exacta_registrar TEXT NOT NULL DEFAULT '',
+      client_registrar TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  );
+  await query(
+    `INSERT INTO command_registrations (
+      id, period_id, bakery, quantity, dm_conf, dm_cad, dm_imp, exacta_registrar, client_registrar, created_at, updated_at
+    )
+    SELECT id, period_id, bakery,
+      CASE WHEN quantity IS NULL OR quantity <= 1 THEN NULL ELSE quantity END,
+      dm_conf, dm_cad, dm_imp, exacta_registrar, client_registrar, created_at, updated_at
+    FROM command_registrations_quantity_old`,
+  );
+  await query(`DROP TABLE command_registrations_quantity_old`);
+  await query(`CREATE INDEX IF NOT EXISTS command_period_bakery_idx
+    ON command_registrations (period_id, bakery COLLATE NOCASE, id DESC)`);
+  await query(`CREATE TRIGGER IF NOT EXISTS command_registration_set_updated_at
+    AFTER UPDATE ON command_registrations
+    WHEN NEW.updated_at = OLD.updated_at
+    BEGIN
+      UPDATE command_registrations SET updated_at = datetime('now') WHERE id = NEW.id;
+    END`);
+}
+
 async function normalizeTextColumn(table, column, normalizer) {
   const { rows } = await query(
     `SELECT id, ${column} AS value
@@ -447,8 +496,8 @@ export async function migrate() {
   await ensureColumn('appointments', 'notes', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'annotations', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'visit_type', "TEXT NOT NULL DEFAULT ''");
-  await ensureColumn('command_registrations', 'quantity', 'INTEGER NOT NULL DEFAULT 1');
-  await query(`UPDATE command_registrations SET quantity = 1 WHERE quantity IS NULL OR quantity < 1`);
+  await ensureCommandQuantityNullable();
+  await query(`UPDATE command_registrations SET quantity = NULL WHERE quantity < 1`);
   await query(`UPDATE appointments SET visit_time = NULL WHERE visit_time IS NOT NULL AND visit_time <> ''`);
   await query(`UPDATE appointments SET visit_value = 0, parts_value = 0 WHERE visit_type IN ('garantia', 'retorno')`);
   await query(

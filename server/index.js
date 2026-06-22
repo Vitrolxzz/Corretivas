@@ -297,7 +297,7 @@ function cleanMoney(value) {
 
 function cleanQuantity(value) {
   if (value === null || value === undefined || value === '') {
-    return 1;
+    return null;
   }
 
   const number = Number(value);
@@ -496,7 +496,7 @@ function commandToJson(row) {
     id: Number(row.id),
     periodId: Number(row.period_id),
     bakery: row.bakery,
-    quantity: Number(row.quantity || 1),
+    quantity: row.quantity === null || row.quantity === undefined ? null : Number(row.quantity),
     dmConf: row.dm_conf,
     dmCad: row.dm_cad,
     dmImp: row.dm_imp,
@@ -2832,7 +2832,12 @@ app.get(
         items: commands.rows.map((row) => ({
           id: Number(row.id),
           label: row.bakery || `Comanda #${row.id}`,
-          description: [`Qtd: ${Number(row.quantity || 1)}`, row.dm_conf, row.dm_cad, row.dm_imp].filter(Boolean).join(' | '),
+          description: [
+            row.quantity === null || row.quantity === undefined ? '' : `Qtd: ${Number(row.quantity)}`,
+            row.dm_conf,
+            row.dm_cad,
+            row.dm_imp,
+          ].filter(Boolean).join(' | ') || 'Cadastro de comanda',
         })),
       },
       {
@@ -2960,7 +2965,7 @@ app.get(
       },
       indicators: {
         totalAttendances: correctiveRecords.length + appointmentRecords.length,
-        totalCommands: commands.rows.reduce((sum, row) => sum + Number(row.quantity || 1), 0),
+        totalCommands: commands.rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0),
         totalBilled,
         lastAttendance: lastDates.sort().at(-1) || null,
       },

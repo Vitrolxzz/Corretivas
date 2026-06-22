@@ -2647,7 +2647,6 @@ List<String> editorFields(String resource) {
 
 String defaultValue(String resource, String key) {
   if (resource == 'agendamentos' && key == 'status') return 'agendada';
-  if (resource == 'comandas' && key == 'quantity') return '1';
   if (resource == 'catracas' && key == 'status') return 'Aguardando montagem';
   if (resource == 'empresas' && key == 'xml') return 'não';
   return '';
@@ -2680,7 +2679,7 @@ dynamic editorValue(String resource, String key, String value) {
   if (numberFieldKeys.contains(key)) {
     if (text.isEmpty) {
       if (key == 'difficulty') return null;
-      if (key == 'quantity') return 1;
+      if (key == 'quantity') return null;
       return 0;
     }
     return num.tryParse(text.replaceAll(',', '.')) ?? text;

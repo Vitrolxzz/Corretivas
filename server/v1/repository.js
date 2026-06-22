@@ -224,7 +224,7 @@ function normalizeAppointmentVisitType(value) {
 
 function normalizeQuantity(value) {
   if (value === null || value === undefined || value === '') {
-    return 1;
+    return null;
   }
 
   const number = Number(value);
