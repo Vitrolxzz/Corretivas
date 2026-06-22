@@ -36,6 +36,13 @@ class AppConfig {
       defaultValue: 'https://corretivas.up.railway.app');
 }
 
+const noChargeAppointmentVisitTypes = {'garantia', 'retorno'};
+
+bool isNoChargeAppointmentType(dynamic value) {
+  return noChargeAppointmentVisitTypes
+      .contains(value?.toString().trim().toLowerCase());
+}
+
 class OperatorAccessPage extends StatefulWidget {
   const OperatorAccessPage({super.key});
 
@@ -1593,6 +1600,12 @@ class _ResourceEditorState extends State<ResourceEditor> {
         entry.key: editorValue(widget.resource, entry.key, entry.value.text)
     };
 
+    if (widget.resource == 'agendamentos' &&
+        isNoChargeAppointmentType(body['visitType'])) {
+      body['visitValue'] = 0;
+      body['partsValue'] = 0;
+    }
+
     if (widget.resource == 'anotacoes' &&
         (body['createdBy']?.toString().trim().isEmpty ?? true)) {
       body['createdBy'] = widget.api.operatorName;
@@ -1671,7 +1684,13 @@ class _ResourceEditorState extends State<ResourceEditor> {
           DropdownMenuItem(value: 'retorno', child: Text('retorno')),
         ],
         onChanged: (value) {
-          entry.value.text = value ?? '';
+          setState(() {
+            entry.value.text = value ?? '';
+            if (isNoChargeAppointmentType(entry.value.text)) {
+              _controllers['visitValue']?.clear();
+              _controllers['partsValue']?.clear();
+            }
+          });
         },
       );
     }
@@ -1719,6 +1738,12 @@ class _ResourceEditorState extends State<ResourceEditor> {
     );
   }
 
+  bool _shouldShowEditorField(String key) {
+    if (widget.resource != 'agendamentos') return true;
+    if (key != 'visitValue' && key != 'partsValue') return true;
+    return !isNoChargeAppointmentType(_controllers['visitType']?.text);
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -1738,10 +1763,12 @@ class _ResourceEditorState extends State<ResourceEditor> {
                     .titleLarge
                     ?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),
-            ..._controllers.entries.map((entry) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _buildEditorField(entry),
-                )),
+            ..._controllers.entries
+                .where((entry) => _shouldShowEditorField(entry.key))
+                .map((entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildEditorField(entry),
+                    )),
             FilledButton.icon(
                 onPressed: _save,
                 icon: const Icon(Icons.save_rounded),
@@ -2376,7 +2403,7 @@ String recordTitle(Map<String, dynamic> record) {
 }
 
 String recordSubtitle(Map<String, dynamic> record) {
-  final ignored = {
+  final ignored = <String>{
     'id',
     'createdAt',
     'updatedAt',
@@ -2384,6 +2411,11 @@ String recordSubtitle(Map<String, dynamic> record) {
     'photo_count',
     'annotations',
   };
+
+  if (isNoChargeAppointmentType(record['visitType'] ?? record['visit_type'])) {
+    ignored.addAll({'visitValue', 'partsValue', 'visit_value', 'parts_value'});
+  }
+
   return record.entries
       .where((entry) =>
           !ignored.contains(entry.key) &&
@@ -2468,7 +2500,7 @@ String formatReportValue(dynamic value, String type) {
 
 List<String> detailFields(String resource, Map<String, dynamic> record) {
   final keys = <String>[];
-  final hidden = hiddenDetailFields(resource);
+  final hidden = hiddenDetailFields(resource, record);
 
   void add(String key, {bool knownField = false}) {
     if (hidden.contains(key)) return;
@@ -2512,8 +2544,8 @@ List<String> detailFields(String resource, Map<String, dynamic> record) {
   return keys;
 }
 
-Set<String> hiddenDetailFields(String resource) {
-  return switch (resource) {
+Set<String> hiddenDetailFields(String resource, Map<String, dynamic> record) {
+  final hidden = switch (resource) {
     'ocorrencias' => {'periodId', 'sourceHash'},
     'agendamentos' => {
         'photoCount',
@@ -2525,6 +2557,19 @@ Set<String> hiddenDetailFields(String resource) {
     'catracas' => {'photoCount', 'photo_count'},
     _ => const <String>{},
   };
+
+  if (resource == 'agendamentos' &&
+      isNoChargeAppointmentType(record['visitType'] ?? record['visit_type'])) {
+    return {
+      ...hidden,
+      'visitValue',
+      'partsValue',
+      'visit_value',
+      'parts_value'
+    };
+  }
+
+  return hidden;
 }
 
 String detailValue(dynamic value) {

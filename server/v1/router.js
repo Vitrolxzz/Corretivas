@@ -169,6 +169,8 @@ function periodToJson(row) {
 }
 
 function appointmentToJson(row) {
+  const noCharge = row.visit_type === 'garantia' || row.visit_type === 'retorno';
+
   return {
     id: String(row.id),
     clientName: row.client_name,
@@ -179,8 +181,8 @@ function appointmentToJson(row) {
     visitType: row.visit_type,
     visitDate: dateToJson(row.visit_date),
     technician: row.technician,
-    visitValue: Number(row.visit_value || 0),
-    partsValue: Number(row.parts_value || 0),
+    visitValue: noCharge ? 0 : Number(row.visit_value || 0),
+    partsValue: noCharge ? 0 : Number(row.parts_value || 0),
     status: row.status,
     conflictCount: Number(row.conflict_count || 0),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
@@ -942,14 +944,14 @@ export function createV1Router({ broadcast }) {
         query(
           `SELECT client AS client, technician, occurrence_date AS date, reason AS problem,
             CASE WHEN solution_date IS NOT NULL AND solution_date <> '' THEN 'concluida' ELSE 'aberta' END AS status,
-            0 AS visit_value, 0 AS parts_value, 'Ocorrencia' AS source
+            0 AS visit_value, 0 AS parts_value, '' AS visit_type, 'Ocorrencia' AS source
            FROM corrective_occurrences
            WHERE occurrence_date >= $1 AND occurrence_date <= $2`,
           [start, end],
         ),
         query(
           `SELECT client_name AS client, technician, visit_date AS date, reported_problem AS problem,
-            status, visit_value, parts_value, 'Agendamento' AS source
+            status, visit_value, parts_value, visit_type, 'Agendamento' AS source
            FROM appointments
            WHERE visit_date >= $1 AND visit_date <= $2`,
           [start, end],

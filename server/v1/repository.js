@@ -244,6 +244,10 @@ function normalizePayload(body, config) {
 
   if (config.table === 'appointments' && Object.prototype.hasOwnProperty.call(normalized, 'visitType')) {
     normalized.visitType = normalizeAppointmentVisitType(normalized.visitType);
+    if (normalized.visitType === 'garantia' || normalized.visitType === 'retorno') {
+      normalized.visitValue = 0;
+      normalized.partsValue = 0;
+    }
   }
 
   if (config.table === 'system_notes') {

@@ -337,7 +337,10 @@ export async function buildDashboardReport(metric, options = {}) {
          WHERE period_id = $1 AND solution_date >= $2 AND solution_date < $3
          UNION ALL
          SELECT 'Visita' AS type, id, client_name AS client, visit_date AS date, technician, status, reported_problem AS details,
-           COALESCE(visit_value, 0) + COALESCE(parts_value, 0) AS value
+           CASE
+             WHEN visit_type IN ('garantia', 'retorno') THEN 0
+             ELSE COALESCE(visit_value, 0) + COALESCE(parts_value, 0)
+           END AS value
          FROM appointments
          WHERE status = 'realizada' AND visit_date >= $2 AND visit_date < $3
        )

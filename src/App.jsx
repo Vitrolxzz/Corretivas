@@ -57,6 +57,7 @@ const difficultyOptions = [
 ];
 const appointmentStatuses = ['agendada', 'realizada', 'cancelada'];
 const appointmentVisitTypes = ['normal', 'garantia', 'retorno'];
+const noChargeAppointmentVisitTypes = new Set(['garantia', 'retorno']);
 const turnstileStatuses = ['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue'];
 const systemNoteAuthors = ['Valquíria', 'Thiago', 'Lucas', 'Rubens', 'Vittor', 'Daniel A.', 'Daniel'];
 const pageSize = 50;
@@ -169,6 +170,10 @@ function formatDate(value) {
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function isNoChargeAppointment(value) {
+  return noChargeAppointmentVisitTypes.has(String(value || '').trim().toLowerCase());
 }
 
 function currentMonth() {
@@ -1050,7 +1055,14 @@ export default function App() {
       : field === 'technician'
         ? normalizeTechnicianInput(value)
         : value;
-    setAppointmentForm((current) => ({ ...current, [field]: normalizedValue }));
+    setAppointmentForm((current) => {
+      const next = { ...current, [field]: normalizedValue };
+      if (field === 'visitType' && isNoChargeAppointment(normalizedValue)) {
+        next.visitValue = '';
+        next.partsValue = '';
+      }
+      return next;
+    });
   }
 
   function updateTurnstile(field, value) {
@@ -1135,9 +1147,12 @@ export default function App() {
     event.preventDefault();
     const method = editingAppointmentId ? 'PUT' : 'POST';
     const path = editingAppointmentId ? `/api/appointments/${editingAppointmentId}` : '/api/appointments';
+    const body = isNoChargeAppointment(appointmentForm.visitType)
+      ? { ...appointmentForm, visitValue: '', partsValue: '' }
+      : appointmentForm;
 
     try {
-      const data = await request(path, { method, body: appointmentForm });
+      const data = await request(path, { method, body });
       const id = editingAppointmentId || data.record.id;
       setEditingAppointmentId(id);
       setAppointmentForm(
@@ -1941,26 +1956,28 @@ export default function App() {
                   onChange={(event) => updateAppointment('technician', event.target.value)}
                 />
               </Field>
-              <div className="form-grid two-fields">
-                <Field label="Valor da visita">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={appointmentForm.visitValue}
-                    onChange={(event) => updateAppointment('visitValue', event.target.value)}
-                  />
-                </Field>
-                <Field label="Valor das pecas">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={appointmentForm.partsValue}
-                    onChange={(event) => updateAppointment('partsValue', event.target.value)}
-                  />
-                </Field>
-              </div>
+              {!isNoChargeAppointment(appointmentForm.visitType) && (
+                <div className="form-grid two-fields">
+                  <Field label="Valor da visita">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={appointmentForm.visitValue}
+                      onChange={(event) => updateAppointment('visitValue', event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Valor das pecas">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={appointmentForm.partsValue}
+                      onChange={(event) => updateAppointment('partsValue', event.target.value)}
+                    />
+                  </Field>
+                </div>
+              )}
               <div className="form-grid two-fields">
                 <Field label="Tipo visita">
                   <select value={appointmentForm.visitType} onChange={(event) => updateAppointment('visitType', event.target.value)}>
@@ -2122,9 +2139,13 @@ export default function App() {
                           </td>
                           <td>{record.technician}</td>
                           <td>
-                            {formatMoney(record.visitValue)}
-                            <br />
-                            {formatMoney(record.partsValue)}
+                            {!isNoChargeAppointment(record.visitType) && (
+                              <>
+                                {formatMoney(record.visitValue)}
+                                <br />
+                                {formatMoney(record.partsValue)}
+                              </>
+                            )}
                           </td>
                           <td>
                             {record.photoCount > 0 ? (
@@ -2443,9 +2464,13 @@ export default function App() {
                           <StatusPill value={record.status} />
                         </td>
                         <td>
-                          {formatMoney(record.visit_value)}
-                          <br />
-                          {formatMoney(record.parts_value)}
+                          {!isNoChargeAppointment(record.visitType || record.visit_type) && (
+                            <>
+                              {formatMoney(record.visit_value)}
+                              <br />
+                              {formatMoney(record.parts_value)}
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))}

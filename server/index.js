@@ -491,6 +491,8 @@ function commandToJson(row) {
 }
 
 function appointmentToJson(row) {
+  const noCharge = row.visit_type === 'garantia' || row.visit_type === 'retorno';
+
   return {
     id: Number(row.id),
     clientName: row.client_name,
@@ -501,8 +503,8 @@ function appointmentToJson(row) {
     visitType: row.visit_type,
     visitDate: dateToJson(row.visit_date),
     technician: row.technician,
-    visitValue: Number(row.visit_value || 0),
-    partsValue: Number(row.parts_value || 0),
+    visitValue: noCharge ? 0 : Number(row.visit_value || 0),
+    partsValue: noCharge ? 0 : Number(row.parts_value || 0),
     status: row.status,
     conflictCount: Number(row.conflict_count || 0),
     photoCount: Number(row.photo_count || 0),
@@ -650,17 +652,20 @@ function commandPayload(body) {
 }
 
 function appointmentPayload(body) {
+  const visitType = cleanAppointmentVisitType(body.visitType);
+  const isNoCharge = visitType === 'garantia' || visitType === 'retorno';
+
   return {
     clientName: cleanClientName(body.clientName),
     address: cleanText(body.address),
     reportedProblem: cleanText(body.reportedProblem),
     notes: cleanText(body.notes),
     annotations: cleanText(body.annotations),
-    visitType: cleanAppointmentVisitType(body.visitType),
+    visitType,
     visitDate: cleanDate(body.visitDate),
     technician: normalizeTechnicianName(body.technician),
-    visitValue: cleanMoney(body.visitValue),
-    partsValue: cleanMoney(body.partsValue),
+    visitValue: isNoCharge ? 0 : cleanMoney(body.visitValue),
+    partsValue: isNoCharge ? 0 : cleanMoney(body.partsValue),
     status: cleanAppointmentStatus(body.status),
   };
 }
@@ -3109,12 +3114,12 @@ app.get(
     const params = [start, end, start, end];
     const reportSql = `SELECT client AS client, technician, occurrence_date AS date, reason AS problem,
           CASE WHEN solution_date IS NOT NULL AND solution_date <> '' THEN 'concluida' ELSE 'aberta' END AS status,
-          0 AS visit_value, 0 AS parts_value, 'Ocorrencia' AS source
+          0 AS visit_value, 0 AS parts_value, '' AS visit_type, 'Ocorrencia' AS source
          FROM corrective_occurrences
          WHERE occurrence_date >= $1 AND occurrence_date <= $2
          UNION ALL
          SELECT client_name AS client, technician, visit_date AS date, reported_problem AS problem,
-          status, visit_value, parts_value, 'Agendamento' AS source
+          status, visit_value, parts_value, visit_type, 'Agendamento' AS source
          FROM appointments
          WHERE visit_date >= $3 AND visit_date <= $4`;
     const [total, records] = await Promise.all([
@@ -3496,8 +3501,8 @@ app.get(
         ['Tipo visita', 'visit_type'],
         ['Data', 'visit_date'],
         ['Tecnico', 'technician'],
-        ['Valor visita', (row) => formatCurrency(row.visit_value)],
-        ['Valor pecas', (row) => formatCurrency(row.parts_value)],
+        ['Valor visita', (row) => (row.visit_type === 'garantia' || row.visit_type === 'retorno' ? '' : formatCurrency(row.visit_value))],
+        ['Valor pecas', (row) => (row.visit_type === 'garantia' || row.visit_type === 'retorno' ? '' : formatCurrency(row.parts_value))],
         ['Status', 'status'],
       ];
 
@@ -3630,14 +3635,14 @@ app.get(
         query(
           `SELECT client AS client, technician, occurrence_date AS date, reason AS problem,
             CASE WHEN solution_date IS NOT NULL AND solution_date <> '' THEN 'concluida' ELSE 'aberta' END AS status,
-            0 AS visit_value, 0 AS parts_value, 'Ocorrencia' AS source
+            0 AS visit_value, 0 AS parts_value, '' AS visit_type, 'Ocorrencia' AS source
            FROM corrective_occurrences
            WHERE occurrence_date >= $1 AND occurrence_date <= $2`,
           [start, end],
         ),
         query(
           `SELECT client_name AS client, technician, visit_date AS date, reported_problem AS problem,
-            status, visit_value, parts_value, 'Agendamento' AS source
+            status, visit_value, parts_value, visit_type, 'Agendamento' AS source
            FROM appointments
            WHERE visit_date >= $1 AND visit_date <= $2`,
           [start, end],
@@ -3651,8 +3656,8 @@ app.get(
         ['Data', 'date'],
         ['Problema', 'problem'],
         ['Status', 'status'],
-        ['Valor visita', (row) => formatCurrency(row.visit_value)],
-        ['Valor pecas', (row) => formatCurrency(row.parts_value)],
+        ['Valor visita', (row) => (row.visit_type === 'garantia' || row.visit_type === 'retorno' ? '' : formatCurrency(row.visit_value))],
+        ['Valor pecas', (row) => (row.visit_type === 'garantia' || row.visit_type === 'retorno' ? '' : formatCurrency(row.parts_value))],
       ];
 
       sendTableExport(res, format, 'relatorio-diario', 'Relatorio diario', columns, rows);
