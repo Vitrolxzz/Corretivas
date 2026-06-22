@@ -295,6 +295,22 @@ function cleanMoney(value) {
   return Math.round(number * 100) / 100;
 }
 
+function cleanQuantity(value) {
+  if (value === null || value === undefined || value === '') {
+    return 1;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isInteger(number) || number < 1) {
+    const error = new Error('Quantidade deve ser um numero inteiro maior que zero.');
+    error.status = 400;
+    throw error;
+  }
+
+  return number;
+}
+
 function cleanAppointmentStatus(value) {
   const normalized = cleanText(value) || 'agendada';
 
@@ -480,6 +496,7 @@ function commandToJson(row) {
     id: Number(row.id),
     periodId: Number(row.period_id),
     bakery: row.bakery,
+    quantity: Number(row.quantity || 1),
     dmConf: row.dm_conf,
     dmCad: row.dm_cad,
     dmImp: row.dm_imp,
@@ -643,6 +660,7 @@ function casePayload(body) {
 function commandPayload(body) {
   return {
     bakery: cleanClientName(body.bakery),
+    quantity: cleanQuantity(body.quantity),
     dmConf: cleanText(body.dmConf),
     dmCad: cleanText(body.dmCad),
     dmImp: cleanText(body.dmImp),
@@ -1175,7 +1193,7 @@ app.get(
       visitTypeShare,
     ] = await Promise.all([
       query('SELECT COUNT(*) AS total FROM corrective_occurrences WHERE period_id = $1', [period.id]),
-      query('SELECT COUNT(*) AS total FROM command_registrations WHERE period_id = $1', [period.id]),
+      query('SELECT COALESCE(SUM(quantity), 0) AS total FROM command_registrations WHERE period_id = $1', [period.id]),
       query(
         `SELECT
           COUNT(*) AS total,
@@ -2212,6 +2230,7 @@ app.get(
         OR dm_conf LIKE $${params.length} COLLATE NOCASE
         OR dm_cad LIKE $${params.length} COLLATE NOCASE
         OR dm_imp LIKE $${params.length} COLLATE NOCASE
+        OR CAST(quantity AS TEXT) LIKE $${params.length}
         OR exacta_registrar LIKE $${params.length} COLLATE NOCASE
         OR client_registrar LIKE $${params.length} COLLATE NOCASE
       )`;
@@ -2259,13 +2278,14 @@ app.post(
     const payload = commandPayload(req.body);
     const inserted = await query(
       `INSERT INTO command_registrations (
-        period_id, bakery, dm_conf, dm_cad, dm_imp, exacta_registrar, client_registrar
+        period_id, bakery, quantity, dm_conf, dm_cad, dm_imp, exacta_registrar, client_registrar
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
       [
         period.id,
         payload.bakery,
+        payload.quantity,
         payload.dmConf,
         payload.dmCad,
         payload.dmImp,
@@ -2287,16 +2307,18 @@ app.put(
     const updated = await query(
       `UPDATE command_registrations
        SET bakery = $2,
-           dm_conf = $3,
-           dm_cad = $4,
-           dm_imp = $5,
-           exacta_registrar = $6,
-           client_registrar = $7
+           quantity = $3,
+           dm_conf = $4,
+           dm_cad = $5,
+           dm_imp = $6,
+           exacta_registrar = $7,
+           client_registrar = $8
        WHERE id = $1
        RETURNING *`,
       [
         Number(req.params.id),
         payload.bakery,
+        payload.quantity,
         payload.dmConf,
         payload.dmCad,
         payload.dmImp,
@@ -2732,9 +2754,10 @@ app.get(
         [like],
       ),
       query(
-        `SELECT id, bakery, dm_conf, dm_cad, dm_imp
+        `SELECT id, bakery, quantity, dm_conf, dm_cad, dm_imp
          FROM command_registrations
          WHERE bakery LIKE $1 COLLATE NOCASE
+            OR CAST(quantity AS TEXT) LIKE $1
             OR dm_conf LIKE $1 COLLATE NOCASE
             OR dm_cad LIKE $1 COLLATE NOCASE
             OR dm_imp LIKE $1 COLLATE NOCASE
@@ -2809,7 +2832,7 @@ app.get(
         items: commands.rows.map((row) => ({
           id: Number(row.id),
           label: row.bakery || `Comanda #${row.id}`,
-          description: [row.dm_conf, row.dm_cad, row.dm_imp].filter(Boolean).join(' | ') || 'Cadastro de comanda',
+          description: [`Qtd: ${Number(row.quantity || 1)}`, row.dm_conf, row.dm_cad, row.dm_imp].filter(Boolean).join(' | '),
         })),
       },
       {
@@ -2937,7 +2960,7 @@ app.get(
       },
       indicators: {
         totalAttendances: correctiveRecords.length + appointmentRecords.length,
-        totalCommands: commands.rows.length,
+        totalCommands: commands.rows.reduce((sum, row) => sum + Number(row.quantity || 1), 0),
         totalBilled,
         lastAttendance: lastDates.sort().at(-1) || null,
       },

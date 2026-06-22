@@ -58,6 +58,7 @@ const schema = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     period_id INTEGER NOT NULL REFERENCES periods(id) ON DELETE RESTRICT,
     bakery TEXT NOT NULL DEFAULT '',
+    quantity INTEGER NOT NULL DEFAULT 1,
     dm_conf TEXT NOT NULL DEFAULT '',
     dm_cad TEXT NOT NULL DEFAULT '',
     dm_imp TEXT NOT NULL DEFAULT '',
@@ -446,6 +447,8 @@ export async function migrate() {
   await ensureColumn('appointments', 'notes', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'annotations', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'visit_type', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn('command_registrations', 'quantity', 'INTEGER NOT NULL DEFAULT 1');
+  await query(`UPDATE command_registrations SET quantity = 1 WHERE quantity IS NULL OR quantity < 1`);
   await query(`UPDATE appointments SET visit_time = NULL WHERE visit_time IS NOT NULL AND visit_time <> ''`);
   await query(`UPDATE appointments SET visit_value = 0, parts_value = 0 WHERE visit_type IN ('garantia', 'retorno')`);
   await query(

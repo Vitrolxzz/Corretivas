@@ -2611,6 +2611,7 @@ List<String> editorFields(String resource) {
       ],
     'comandas' => [
         'bakery',
+        'quantity',
         'dmConf',
         'dmCad',
         'dmImp',
@@ -2646,6 +2647,7 @@ List<String> editorFields(String resource) {
 
 String defaultValue(String resource, String key) {
   if (resource == 'agendamentos' && key == 'status') return 'agendada';
+  if (resource == 'comandas' && key == 'quantity') return '1';
   if (resource == 'catracas' && key == 'status') return 'Aguardando montagem';
   if (resource == 'empresas' && key == 'xml') return 'não';
   return '';
@@ -2658,7 +2660,7 @@ const dateFieldKeys = {
   'expectedDeliveryDate',
 };
 
-const numberFieldKeys = {'difficulty', 'visitValue', 'partsValue'};
+const numberFieldKeys = {'difficulty', 'quantity', 'visitValue', 'partsValue'};
 
 const appointmentStatusOptions = ['agendada', 'realizada', 'cancelada'];
 const appointmentVisitTypeOptions = ['normal', 'garantia', 'retorno'];
@@ -2676,7 +2678,11 @@ dynamic editorValue(String resource, String key, String value) {
   }
 
   if (numberFieldKeys.contains(key)) {
-    if (text.isEmpty) return key == 'difficulty' ? null : 0;
+    if (text.isEmpty) {
+      if (key == 'difficulty') return null;
+      if (key == 'quantity') return 1;
+      return 0;
+    }
     return num.tryParse(text.replaceAll(',', '.')) ?? text;
   }
 
@@ -2791,6 +2797,7 @@ String fieldLabel(String key) {
     'visitType': 'Tipo visita',
     'status': 'Status',
     'bakery': 'Padaria',
+    'quantity': 'Quantidade',
     'dmConf': 'D/M Conf.',
     'dmCad': 'D/M Cad.',
     'dmImp': 'D/M Imp.',

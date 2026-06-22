@@ -75,6 +75,7 @@ const resources = [
     table: 'command_registrations',
     fields: {
       bakery: 'bakery',
+      quantity: 'quantity',
       dm_conf: 'dmConf',
       dm_cad: 'dmCad',
       dm_imp: 'dmImp',

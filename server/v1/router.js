@@ -392,7 +392,7 @@ export function createV1Router({ broadcast }) {
         visitTypeShare,
       ] = await Promise.all([
         query('SELECT COUNT(*) AS total FROM corrective_occurrences WHERE period_id = $1', [period.id]),
-        query('SELECT COUNT(*) AS total FROM command_registrations WHERE period_id = $1', [period.id]),
+        query('SELECT COALESCE(SUM(quantity), 0) AS total FROM command_registrations WHERE period_id = $1', [period.id]),
         query(
           `SELECT
             COUNT(*) AS total,

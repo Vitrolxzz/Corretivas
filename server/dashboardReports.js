@@ -95,6 +95,7 @@ const reportDefinitions = {
     description: 'Comandas cadastradas no periodo ativo.',
     columns: [
       ['Padaria', 'client'],
+      ['Quantidade', 'quantity'],
       ['D/M Conf.', 'dmConf'],
       ['D/M Cad.', 'dmCad'],
       ['D/M Imp.', 'dmImp'],
@@ -351,9 +352,9 @@ export async function buildDashboardReport(metric, options = {}) {
   }
 
   if (metric === 'commands') {
-    total = await count(`SELECT COUNT(*) AS total FROM command_registrations WHERE period_id = $1`, [period.id]);
+    total = await count(`SELECT COALESCE(SUM(quantity), 0) AS total FROM command_registrations WHERE period_id = $1`, [period.id]);
     ({ rows } = await query(
-      `SELECT id, bakery AS client, dm_conf AS dmConf, dm_cad AS dmCad, dm_imp AS dmImp,
+      `SELECT id, bakery AS client, quantity, dm_conf AS dmConf, dm_cad AS dmCad, dm_imp AS dmImp,
         exacta_registrar AS exactaRegistrar, client_registrar AS clientRegistrar, created_at AS createdAt
        FROM command_registrations
        WHERE period_id = $1

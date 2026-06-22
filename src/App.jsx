@@ -95,6 +95,7 @@ const emptyCase = {
 
 const emptyCommand = {
   bakery: '',
+  quantity: '1',
   dmConf: '',
   dmCad: '',
   dmImp: '',
@@ -1308,6 +1309,7 @@ export default function App() {
     setCommandForm(
       normalizeForForm({
         bakery: record.bakery,
+        quantity: record.quantity || 1,
         dmConf: record.dmConf,
         dmCad: record.dmCad,
         dmImp: record.dmImp,
@@ -2604,6 +2606,15 @@ export default function App() {
                 <Field label="Padaria">
                   <input list="client-list" value={commandForm.bakery} onChange={(event) => updateCommand('bakery', event.target.value)} />
                 </Field>
+                <Field label="Quantidade">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={commandForm.quantity}
+                    onChange={(event) => updateCommand('quantity', event.target.value)}
+                  />
+                </Field>
                 <Field label="D/M Conf.">
                   <input value={commandForm.dmConf} onChange={(event) => updateCommand('dmConf', event.target.value)} />
                 </Field>
@@ -2653,6 +2664,7 @@ export default function App() {
                 <thead>
                   <tr>
                     <th>Padaria</th>
+                    <th>Quantidade</th>
                     <th>D/M Conf.</th>
                     <th>D/M Cad.</th>
                     <th>D/M Imp.</th>
@@ -2669,6 +2681,7 @@ export default function App() {
                           {record.bakery}
                         </button>
                       </td>
+                      <td>{record.quantity || 1}</td>
                       <td>{record.dmConf}</td>
                       <td>{record.dmCad}</td>
                       <td>{record.dmImp}</td>
@@ -3221,7 +3234,7 @@ function HistoryTables({ history, openClientHistory }) {
                   </button>
                 </td>
                 <td>-</td>
-                <td className="long-cell">{[record.dmConf, record.dmCad, record.dmImp].filter(Boolean).join(' | ')}</td>
+                <td className="long-cell">{[`Qtd: ${record.quantity || 1}`, record.dmConf, record.dmCad, record.dmImp].filter(Boolean).join(' | ')}</td>
                 <td>-</td>
               </tr>
             ))}

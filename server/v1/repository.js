@@ -76,6 +76,7 @@ const resources = {
     fields: {
       periodId: 'period_id',
       bakery: 'bakery',
+      quantity: 'quantity',
       dmConf: 'dm_conf',
       dmCad: 'dm_cad',
       dmImp: 'dm_imp',
@@ -221,6 +222,22 @@ function normalizeAppointmentVisitType(value) {
   return text;
 }
 
+function normalizeQuantity(value) {
+  if (value === null || value === undefined || value === '') {
+    return 1;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isInteger(number) || number < 1) {
+    const error = new Error('Quantidade deve ser um numero inteiro maior que zero.');
+    error.status = 400;
+    throw error;
+  }
+
+  return number;
+}
+
 function normalizePayload(body, config) {
   const normalized = { ...body };
 
@@ -248,6 +265,10 @@ function normalizePayload(body, config) {
       normalized.visitValue = 0;
       normalized.partsValue = 0;
     }
+  }
+
+  if (config.table === 'command_registrations') {
+    normalized.quantity = normalizeQuantity(normalized.quantity);
   }
 
   if (config.table === 'system_notes') {
