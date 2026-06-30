@@ -1234,35 +1234,66 @@ tr:hover td.row-actions {
 }
 
 .kanban-card.urgency-yellow {
-  background: linear-gradient(90deg, rgba(244, 198, 101, 0.16), rgba(15, 18, 23, 0.96) 38%);
+  background: linear-gradient(90deg, rgba(244, 198, 101, 0.24) 0%, rgba(244, 198, 101, 0.14) 48%, rgba(15, 18, 23, 0.96) 62%);
 }
 
 .kanban-card.urgency-orange {
-  background: linear-gradient(90deg, rgba(245, 158, 77, 0.19), rgba(15, 18, 23, 0.96) 40%);
+  background: linear-gradient(90deg, rgba(245, 158, 77, 0.26) 0%, rgba(245, 158, 77, 0.16) 50%, rgba(15, 18, 23, 0.96) 64%);
 }
 
 .kanban-card.urgency-red {
-  background: linear-gradient(90deg, rgba(242, 100, 117, 0.2), rgba(15, 18, 23, 0.96) 42%);
+  background: linear-gradient(90deg, rgba(242, 100, 117, 0.28) 0%, rgba(242, 100, 117, 0.17) 52%, rgba(15, 18, 23, 0.96) 66%);
 }
 
 .kanban-card.urgency-completed {
-  background: linear-gradient(90deg, rgba(82, 209, 129, 0.14), rgba(15, 18, 23, 0.96) 38%);
+  background: linear-gradient(90deg, rgba(82, 209, 129, 0.2) 0%, rgba(82, 209, 129, 0.12) 48%, rgba(15, 18, 23, 0.96) 62%);
 }
 
 tr.urgency-yellow {
+  --urgency-row-bg: rgba(244, 198, 101, 0.12);
+  --urgency-row-hover-bg: rgba(244, 198, 101, 0.18);
+  --urgency-row-border: var(--amber);
   box-shadow: inset 4px 0 0 var(--amber);
 }
 
 tr.urgency-orange {
+  --urgency-row-bg: rgba(245, 158, 77, 0.13);
+  --urgency-row-hover-bg: rgba(245, 158, 77, 0.2);
+  --urgency-row-border: var(--orange);
   box-shadow: inset 4px 0 0 var(--orange);
 }
 
 tr.urgency-red {
+  --urgency-row-bg: rgba(242, 100, 117, 0.14);
+  --urgency-row-hover-bg: rgba(242, 100, 117, 0.21);
+  --urgency-row-border: var(--danger);
   box-shadow: inset 4px 0 0 var(--danger);
 }
 
 tr.urgency-completed {
+  --urgency-row-bg: rgba(82, 209, 129, 0.1);
+  --urgency-row-hover-bg: rgba(82, 209, 129, 0.16);
+  --urgency-row-border: var(--green);
   box-shadow: inset 4px 0 0 var(--green);
+}
+
+tbody tr[class*="urgency-"] td {
+  background: var(--urgency-row-bg);
+}
+
+tbody tr[class*="urgency-"]:hover td {
+  background: var(--urgency-row-hover-bg);
+}
+
+tbody tr[class*="urgency-"] td.row-actions {
+  background: var(--urgency-row-bg);
+  box-shadow:
+    inset 4px 0 0 var(--urgency-row-border),
+    -10px 0 16px rgba(0, 0, 0, 0.18);
+}
+
+tbody tr[class*="urgency-"]:hover td.row-actions {
+  background: var(--urgency-row-hover-bg);
 }
 
 .photo-panel {
