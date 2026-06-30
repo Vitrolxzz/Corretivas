@@ -238,6 +238,46 @@ function normalizeQuantity(value) {
   return number;
 }
 
+function todayText() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function dateText(value) {
+  const text = String(value || '').trim();
+  return text ? text.slice(0, 10) : '';
+}
+
+function turnstileStatusAgeDays(record) {
+  const sourceDate = dateText(record.statusUpdatedAt || record.status_updated_at || record.createdAt || record.created_at || record.updatedAt || record.updated_at);
+
+  if (!sourceDate) {
+    return 0;
+  }
+
+  const start = new Date(`${sourceDate}T00:00:00Z`);
+  const end = new Date(`${todayText()}T00:00:00Z`);
+  const days = Math.floor((end.getTime() - start.getTime()) / 86400000);
+  return Number.isFinite(days) ? Math.max(0, days) : 0;
+}
+
+function withTurnstileUrgency(record) {
+  const days = turnstileStatusAgeDays(record);
+
+  if (record.status === 'Entregue') {
+    return { ...record, urgencyStatus: 'completed', urgencyLabel: 'Concluida', statusAgeDays: days };
+  }
+
+  if (days >= 6) {
+    return { ...record, urgencyStatus: 'red', urgencyLabel: 'Urgente', statusAgeDays: days };
+  }
+
+  if (days >= 3) {
+    return { ...record, urgencyStatus: 'orange', urgencyLabel: 'Atenção', statusAgeDays: days };
+  }
+
+  return { ...record, urgencyStatus: 'yellow', urgencyLabel: 'Menos urgente', statusAgeDays: days };
+}
+
 function normalizePayload(body, config) {
   const normalized = { ...body };
 
@@ -308,6 +348,10 @@ function toApi(row, config) {
     record.id = String(record.id);
   }
 
+  if (config.table === 'turnstiles') {
+    return withTurnstileUrgency(record);
+  }
+
   return record;
 }
 
@@ -350,7 +394,8 @@ export async function listRecords(resource, options = {}) {
 
     const snapshot = await ref.get();
     const records = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    return paginated(records.slice(offset, offset + limit), records.length);
+    const decorated = resource === 'catracas' ? records.map(withTurnstileUrgency) : records;
+    return paginated(decorated.slice(offset, offset + limit), records.length);
   }
 
   if (resource === 'clientes') {
@@ -515,7 +560,8 @@ export async function getRecord(resource, id) {
       return null;
     }
 
-    return { id: doc.id, ...doc.data() };
+    const record = { id: doc.id, ...doc.data() };
+    return resource === 'catracas' ? withTurnstileUrgency(record) : record;
   }
 
   if (resource === 'agendamentos') {
@@ -550,13 +596,22 @@ export async function createRecord(resource, body) {
   const config = resourceConfig(resource);
   const normalizedBody = normalizePayload(body, config);
 
+  if (resource === 'catracas') {
+    normalizedBody.statusUpdatedAt = new Date().toISOString();
+  }
+
   if (backend() === 'firebase') {
     const payload = { ...normalizedBody, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
     const doc = await firestore().collection(config.collection).add(payload);
-    return { id: doc.id, ...payload };
+    const record = { id: doc.id, ...payload };
+    return resource === 'catracas' ? withTurnstileUrgency(record) : record;
   }
 
   const mapped = toDb(normalizedBody, config);
+
+  if (resource === 'catracas') {
+    mapped.status_updated_at = normalizedBody.statusUpdatedAt;
+  }
 
   if ((resource === 'ocorrencias' || resource === 'comandas') && !mapped.period_id) {
     const active = await query(`SELECT id FROM periods WHERE status = 'active' ORDER BY year DESC LIMIT 1`);
@@ -581,12 +636,33 @@ export async function updateRecord(resource, id, body) {
 
   if (backend() === 'firebase') {
     const ref = firestore().collection(config.collection).doc(String(id));
-    await ref.set({ ...normalizedBody, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    const existing = await ref.get();
+    const existingData = existing.exists ? existing.data() : {};
+    const statusChanged =
+      resource === 'catracas' &&
+      Object.prototype.hasOwnProperty.call(normalizedBody, 'status') &&
+      existingData?.status !== normalizedBody.status;
+    const payload = {
+      ...normalizedBody,
+      ...(statusChanged ? { statusUpdatedAt: new Date().toISOString() } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    await ref.set(payload, { merge: true });
     const updated = await ref.get();
-    return { id: updated.id, ...updated.data() };
+    const record = { id: updated.id, ...updated.data() };
+    return resource === 'catracas' ? withTurnstileUrgency(record) : record;
   }
 
   const mapped = toDb(normalizedBody, config);
+
+  if (resource === 'catracas' && Object.prototype.hasOwnProperty.call(mapped, 'status')) {
+    const current = await query(`SELECT status, status_updated_at FROM turnstiles WHERE id = $1`, [Number(id)]);
+
+    if (current.rows[0] && (current.rows[0].status !== mapped.status || !current.rows[0].status_updated_at)) {
+      mapped.status_updated_at = new Date().toISOString();
+    }
+  }
+
   const columns = Object.keys(mapped);
 
   if (!columns.length) {

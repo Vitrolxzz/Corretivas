@@ -31,6 +31,7 @@
   --accent-strong: #22aa94;
 
   --amber: #f4c665;
+  --orange: #f59e4d;
   --blue: #6ca7f5;
   --danger: #f26475;
   --green: #52d181;
@@ -1152,6 +1153,44 @@ tr:hover td.row-actions {
   color: var(--muted);
 }
 
+.kanban-card .urgency-note {
+  width: max-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.kanban-card .urgency-note.urgency-yellow,
+.status-pill.urgency-pill.urgency-yellow {
+  border-color: rgba(244, 198, 101, 0.42);
+  background: rgba(244, 198, 101, 0.13);
+  color: #ffe0a0;
+}
+
+.kanban-card .urgency-note.urgency-orange,
+.status-pill.urgency-pill.urgency-orange {
+  border-color: rgba(245, 158, 77, 0.42);
+  background: rgba(245, 158, 77, 0.14);
+  color: #ffd0a1;
+}
+
+.kanban-card .urgency-note.urgency-red,
+.status-pill.urgency-pill.urgency-red {
+  border-color: rgba(242, 100, 117, 0.5);
+  background: rgba(242, 100, 117, 0.15);
+  color: #ffb2bc;
+}
+
+.kanban-card .urgency-note.urgency-completed,
+.status-pill.urgency-pill.urgency-completed {
+  border-color: rgba(82, 209, 129, 0.42);
+  background: rgba(82, 209, 129, 0.13);
+  color: #b7f4ca;
+}
+
 .kanban-card em {
   gap: 5px;
   color: var(--accent);
@@ -1172,6 +1211,58 @@ tr:hover td.row-actions {
 .due-completed,
 .kanban-card.due-completed {
   border-left-color: var(--green);
+}
+
+.urgency-yellow,
+.kanban-card.urgency-yellow {
+  border-left-color: var(--amber);
+}
+
+.urgency-orange,
+.kanban-card.urgency-orange {
+  border-left-color: var(--orange);
+}
+
+.urgency-red,
+.kanban-card.urgency-red {
+  border-left-color: var(--danger);
+}
+
+.urgency-completed,
+.kanban-card.urgency-completed {
+  border-left-color: var(--green);
+}
+
+.kanban-card.urgency-yellow {
+  background: linear-gradient(90deg, rgba(244, 198, 101, 0.16), rgba(15, 18, 23, 0.96) 38%);
+}
+
+.kanban-card.urgency-orange {
+  background: linear-gradient(90deg, rgba(245, 158, 77, 0.19), rgba(15, 18, 23, 0.96) 40%);
+}
+
+.kanban-card.urgency-red {
+  background: linear-gradient(90deg, rgba(242, 100, 117, 0.2), rgba(15, 18, 23, 0.96) 42%);
+}
+
+.kanban-card.urgency-completed {
+  background: linear-gradient(90deg, rgba(82, 209, 129, 0.14), rgba(15, 18, 23, 0.96) 38%);
+}
+
+tr.urgency-yellow {
+  box-shadow: inset 4px 0 0 var(--amber);
+}
+
+tr.urgency-orange {
+  box-shadow: inset 4px 0 0 var(--orange);
+}
+
+tr.urgency-red {
+  box-shadow: inset 4px 0 0 var(--danger);
+}
+
+tr.urgency-completed {
+  box-shadow: inset 4px 0 0 var(--green);
 }
 
 .photo-panel {

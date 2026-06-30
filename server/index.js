@@ -554,7 +554,44 @@ function turnstileDueStatus(row) {
   return 'normal';
 }
 
+function turnstileStatusAgeDays(row) {
+  const sourceDate = dateToJson(row.status_updated_at || row.created_at || row.updated_at);
+
+  if (!sourceDate) {
+    return 0;
+  }
+
+  const start = new Date(`${sourceDate}T00:00:00Z`);
+  const end = new Date(`${todayText()}T00:00:00Z`);
+  const days = Math.floor((end.getTime() - start.getTime()) / 86400000);
+  return Number.isFinite(days) ? Math.max(0, days) : 0;
+}
+
+function turnstileUrgency(row) {
+  if (row.status === 'Entregue') {
+    return {
+      status: 'completed',
+      label: 'Concluida',
+      days: turnstileStatusAgeDays(row),
+    };
+  }
+
+  const days = turnstileStatusAgeDays(row);
+
+  if (days >= 6) {
+    return { status: 'red', label: 'Urgente', days };
+  }
+
+  if (days >= 3) {
+    return { status: 'orange', label: 'Atenção', days };
+  }
+
+  return { status: 'yellow', label: 'Menos urgente', days };
+}
+
 function turnstileToJson(row) {
+  const urgency = turnstileUrgency(row);
+
   return {
     id: Number(row.id),
     clientName: row.client_name,
@@ -564,6 +601,10 @@ function turnstileToJson(row) {
     notes: row.notes,
     status: row.status,
     dueStatus: turnstileDueStatus(row),
+    urgencyStatus: urgency.status,
+    urgencyLabel: urgency.label,
+    statusAgeDays: urgency.days,
+    statusUpdatedAt: row.status_updated_at ? new Date(row.status_updated_at).toISOString() : null,
     photoCount: Number(row.photo_count || 0),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
@@ -2479,9 +2520,9 @@ app.post(
     const payload = turnstilePayload(req.body);
     const inserted = await query(
       `INSERT INTO turnstiles (
-        client_name, model, client_address, expected_delivery_date, notes, status
+        client_name, model, client_address, expected_delivery_date, notes, status, status_updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6)
+      VALUES ($1, $2, $3, $4, $5, $6, datetime('now'))
       RETURNING *`,
       [
         payload.clientName,
@@ -2509,6 +2550,10 @@ app.put(
            client_address = $4,
            expected_delivery_date = $5,
            notes = $6,
+           status_updated_at = CASE
+             WHEN status <> $7 OR status_updated_at IS NULL THEN datetime('now')
+             ELSE status_updated_at
+           END,
            status = $7
        WHERE id = $1
        RETURNING *`,
@@ -2540,7 +2585,11 @@ app.patch(
     const status = cleanTurnstileStatus(req.body?.status);
     const updated = await query(
       `UPDATE turnstiles
-       SET status = $2
+       SET status_updated_at = CASE
+             WHEN status <> $2 OR status_updated_at IS NULL THEN datetime('now')
+             ELSE status_updated_at
+           END,
+           status = $2
        WHERE id = $1
        RETURNING *`,
       [Number(req.params.id), status],
@@ -3585,6 +3634,10 @@ app.get(
         ['Entrega prevista', 'expected_delivery_date'],
         ['Status', 'status'],
         ['Prazo', (row) => turnstileDueStatus(row)],
+        ['Urgencia', (row) => {
+          const urgency = turnstileUrgency(row);
+          return urgency.days > 0 ? `${urgency.label} (${urgency.days}d)` : urgency.label;
+        }],
         ['Observacoes', 'notes'],
       ];
 

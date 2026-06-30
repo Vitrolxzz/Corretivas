@@ -243,6 +243,23 @@ function StatusPill({ value }) {
   return <span className={`status-pill ${token}`}>{value || '-'}</span>;
 }
 
+function turnstileUrgencyText(record) {
+  if (!record) {
+    return '-';
+  }
+
+  if (record.urgencyLabel) {
+    return record.statusAgeDays > 0 ? `${record.urgencyLabel} (${record.statusAgeDays}d)` : record.urgencyLabel;
+  }
+
+  return '-';
+}
+
+function TurnstileUrgencyPill({ record }) {
+  const urgency = record?.urgencyStatus || 'yellow';
+  return <span className={`status-pill urgency-pill urgency-${urgency}`}>{turnstileUrgencyText(record)}</span>;
+}
+
 function PeriodBadge({ period }) {
   if (!period) {
     return <span className="period-badge muted">Sem periodo</span>;
@@ -3065,7 +3082,7 @@ export default function App() {
                       .filter((record) => record.status === status)
                       .map((record) => (
                         <button
-                          className={`kanban-card due-${record.dueStatus}`}
+                          className={`kanban-card due-${record.dueStatus} urgency-${record.urgencyStatus || 'yellow'}`}
                           key={record.id}
                           type="button"
                           draggable
@@ -3075,6 +3092,7 @@ export default function App() {
                           <strong>{record.clientName}</strong>
                           <span>{record.model || 'Sem modelo'}</span>
                           <small>{formatDate(record.expectedDeliveryDate)}</small>
+                          <small className={`urgency-note urgency-${record.urgencyStatus || 'yellow'}`}>{turnstileUrgencyText(record)}</small>
                           {record.photoCount > 0 && (
                             <em>
                               <ImageIcon size={13} /> {record.photoCount}
@@ -3095,6 +3113,7 @@ export default function App() {
                       <th>Endereco</th>
                       <th>Entrega</th>
                       <th>Status</th>
+                      <th>Urgencia</th>
                       <th>Prazo</th>
                       <th>Fotos</th>
                       <th className="actions-heading">Acoes</th>
@@ -3102,7 +3121,7 @@ export default function App() {
                   </thead>
                   <tbody>
                     {turnstiles.map((record) => (
-                      <tr key={record.id} className={`due-${record.dueStatus}`}>
+                      <tr key={record.id} className={`due-${record.dueStatus} urgency-${record.urgencyStatus || 'yellow'}`}>
                         <td>
                           <button className="text-link" type="button" onClick={() => openClientHistory(record.clientName)}>
                             {record.clientName}
@@ -3113,6 +3132,9 @@ export default function App() {
                         <td>{formatDate(record.expectedDeliveryDate)}</td>
                         <td>
                           <StatusPill value={record.status} />
+                        </td>
+                        <td>
+                          <TurnstileUrgencyPill record={record} />
                         </td>
                         <td>
                           <StatusPill

@@ -43,6 +43,38 @@ bool isNoChargeAppointmentType(dynamic value) {
       .contains(value?.toString().trim().toLowerCase());
 }
 
+String turnstileUrgencyLabel(Map<String, dynamic> record) {
+  final label = record['urgencyLabel']?.toString().trim();
+  final days = int.tryParse(record['statusAgeDays']?.toString() ?? '') ?? 0;
+
+  if (label == null || label.isEmpty) {
+    return '';
+  }
+
+  return days > 0 ? '$label (${days}d)' : label;
+}
+
+Color turnstileUrgencyColor(Map<String, dynamic> record) {
+  switch (record['urgencyStatus']?.toString()) {
+    case 'orange':
+      return const Color(0xFFF59E4D);
+    case 'red':
+      return CorretivasTheme.danger;
+    case 'completed':
+      return const Color(0xFF52D181);
+    case 'yellow':
+    default:
+      return CorretivasTheme.amber;
+  }
+}
+
+Color turnstileUrgencyBackground(Map<String, dynamic> record) {
+  return Color.alphaBlend(
+    turnstileUrgencyColor(record).withAlpha(28),
+    CorretivasTheme.panel,
+  );
+}
+
 class OperatorAccessPage extends StatefulWidget {
   const OperatorAccessPage({super.key});
 
@@ -1475,34 +1507,47 @@ class _ResourcePageState extends State<ResourcePage> {
                 child: Text(_error!,
                     style: const TextStyle(color: CorretivasTheme.danger)))
           else ...[
-            ..._filtered.map((record) => Card(
-                  child: ListTile(
-                    onTap: () => _openDetail(record),
-                    title: Text(recordTitle(record)),
-                    subtitle: Text(recordSubtitle(record),
-                        maxLines: 3, overflow: TextOverflow.ellipsis),
-                    leading: Icon(widget.icon, color: CorretivasTheme.accent),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'detail') _openDetail(record);
-                        if (value == 'edit') _openEditor(record);
-                        if (value == 'delete') _delete(record);
-                        if (value == 'photo') _pickPhoto(record);
-                      },
-                      itemBuilder: (_) => [
+            ..._filtered.map((record) {
+              final isTurnstile = widget.resource == 'catracas';
+              final urgencyColor =
+                  isTurnstile ? turnstileUrgencyColor(record) : null;
+
+              return Card(
+                color: isTurnstile ? turnstileUrgencyBackground(record) : null,
+                shape: isTurnstile
+                    ? RoundedRectangleBorder(
+                        side: BorderSide(color: urgencyColor!, width: 1.4),
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(8)),
+                      )
+                    : null,
+                child: ListTile(
+                  onTap: () => _openDetail(record),
+                  title: Text(recordTitle(record)),
+                  subtitle: Text(recordSubtitle(record),
+                      maxLines: 3, overflow: TextOverflow.ellipsis),
+                  leading: Icon(widget.icon, color: CorretivasTheme.accent),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'detail') _openDetail(record);
+                      if (value == 'edit') _openEditor(record);
+                      if (value == 'delete') _delete(record);
+                      if (value == 'photo') _pickPhoto(record);
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                          value: 'detail', child: Text('Ver detalhes')),
+                      const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                      if (widget.photos)
                         const PopupMenuItem(
-                            value: 'detail', child: Text('Ver detalhes')),
-                        const PopupMenuItem(
-                            value: 'edit', child: Text('Editar')),
-                        if (widget.photos)
-                          const PopupMenuItem(
-                              value: 'photo', child: Text('Enviar foto')),
-                        const PopupMenuItem(
-                            value: 'delete', child: Text('Excluir')),
-                      ],
-                    ),
+                            value: 'photo', child: Text('Enviar foto')),
+                      const PopupMenuItem(
+                          value: 'delete', child: Text('Excluir')),
+                    ],
                   ),
-                )),
+                ),
+              );
+            }),
             _MobilePaginationControls(
               page: _page,
               totalPages: _totalPages,
@@ -2410,13 +2455,17 @@ String recordSubtitle(Map<String, dynamic> record) {
     'photoCount',
     'photo_count',
     'annotations',
+    'urgencyStatus',
+    'statusAgeDays',
+    'statusUpdatedAt',
+    'status_updated_at',
   };
 
   if (isNoChargeAppointmentType(record['visitType'] ?? record['visit_type'])) {
     ignored.addAll({'visitValue', 'partsValue', 'visit_value', 'parts_value'});
   }
 
-  return record.entries
+  final lines = record.entries
       .where((entry) =>
           !ignored.contains(entry.key) &&
           entry.value != null &&
@@ -2424,7 +2473,14 @@ String recordSubtitle(Map<String, dynamic> record) {
       .take(5)
       .map((entry) {
     return '${fieldLabel(entry.key)}: ${entry.value}';
-  }).join('\n');
+  }).toList();
+
+  final urgency = turnstileUrgencyLabel(record);
+  if (urgency.isNotEmpty) {
+    lines.insert(0, 'Urgencia: $urgency');
+  }
+
+  return lines.join('\n');
 }
 
 List<Map<String, dynamic>> listOfMaps(dynamic value) {
@@ -2554,7 +2610,14 @@ Set<String> hiddenDetailFields(String resource, Map<String, dynamic> record) {
         'visitTime',
         'visit_time',
       },
-    'catracas' => {'photoCount', 'photo_count'},
+    'catracas' => {
+        'photoCount',
+        'photo_count',
+        'urgencyStatus',
+        'statusAgeDays',
+        'statusUpdatedAt',
+        'status_updated_at',
+      },
     _ => const <String>{},
   };
 
@@ -2795,6 +2858,7 @@ String fieldLabel(String key) {
     'partsValue': 'Valor das pecas',
     'visitType': 'Tipo visita',
     'status': 'Status',
+    'urgencyLabel': 'Urgencia',
     'bakery': 'Padaria',
     'quantity': 'Quantidade',
     'dmConf': 'D/M Conf.',

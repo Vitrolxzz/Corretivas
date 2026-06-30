@@ -137,6 +137,7 @@ const schema = [
     notes TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'Aguardando montagem'
       CHECK (status IN ('Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue')),
+    status_updated_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
@@ -496,6 +497,12 @@ export async function migrate() {
   await ensureColumn('appointments', 'notes', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'annotations', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'visit_type', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn('turnstiles', 'status_updated_at', 'TEXT');
+  await query(
+    `UPDATE turnstiles
+     SET status_updated_at = COALESCE(created_at, updated_at, datetime('now'))
+     WHERE status_updated_at IS NULL OR status_updated_at = ''`,
+  );
   await ensureCommandQuantityNullable();
   await query(`UPDATE command_registrations SET quantity = NULL WHERE quantity < 1`);
   await query(`UPDATE appointments SET visit_time = NULL WHERE visit_time IS NOT NULL AND visit_time <> ''`);
