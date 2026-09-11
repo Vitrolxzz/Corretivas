@@ -1296,8 +1296,9 @@ export default function App() {
     let startTimer;
     let nextTabTimer;
     let cancelled = false;
+    let lastFrameTime = null;
 
-    const scrollSlowly = () => {
+    const scrollSlowly = (frameTime) => {
       if (cancelled) {
         return;
       }
@@ -1309,11 +1310,16 @@ export default function App() {
           if (!cancelled) {
             setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
           }
-        }, 3000);
+        }, displayTabs[displayModeTabIndex] === 'turnstiles' ? 4000 : 3000);
         return;
       }
 
-      window.scrollBy({ top: 0.7, left: 0, behavior: 'auto' });
+      if (lastFrameTime !== null) {
+        const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
+        window.scrollBy({ top: 55 * elapsedSeconds, left: 0, behavior: 'auto' });
+      }
+
+      lastFrameTime = frameTime;
       frameId = window.requestAnimationFrame(scrollSlowly);
     };
 
