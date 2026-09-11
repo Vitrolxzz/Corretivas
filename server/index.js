@@ -51,6 +51,9 @@ const healthOptions = new Set(['Ok', 'Nulo']);
 const appointmentStatuses = new Set(['agendada', 'realizada', 'cancelada']);
 const appointmentVisitTypes = new Set(['normal', 'garantia', 'retorno']);
 const turnstileStatuses = new Set(['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue']);
+const lightSensorProblemOptions = new Set(['sim', 'nao']);
+const lightSensorBrands = new Set(['Evo', 'Henry']);
+const henrySensorModels = new Set(['Sense', 'Inteligente']);
 const systemNoteAuthors = new Set(['Valquíria', 'Thiago', 'Lucas', 'Rubens', 'Vittor', 'Daniel A.', 'Daniel']);
 const caseSituations = new Set(['com problema', 'em observação', 'em testes', 'ok']);
 
@@ -639,6 +642,18 @@ function companyToJson(row) {
   };
 }
 
+function lightSensorToJson(row) {
+  return {
+    id: Number(row.id),
+    clientName: row.client_name,
+    hasProblem: row.has_problem,
+    brand: row.brand,
+    henryModel: row.henry_model,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+  };
+}
+
 function turnstilePhotoToJson(row) {
   return {
     id: Number(row.id),
@@ -789,6 +804,61 @@ function companyPayload(body) {
     turnstileType: cleanText(body.turnstileType),
     anydesk: cleanText(body.anydesk),
     notes: cleanText(body.notes),
+  };
+}
+
+function cleanLightSensorProblem(value) {
+  const normalized = cleanText(value).toLocaleLowerCase('pt-BR') || 'nao';
+
+  if (!lightSensorProblemOptions.has(normalized)) {
+    const error = new Error('Opcao de problema invalida. Use sim ou nao.');
+    error.status = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
+function cleanLightSensorBrand(value) {
+  const normalized = cleanText(value);
+
+  if (!normalized) {
+    return '';
+  }
+
+  if (!lightSensorBrands.has(normalized)) {
+    const error = new Error('Marca invalida. Use Evo ou Henry.');
+    error.status = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
+function cleanHenrySensorModel(value, brand) {
+  const normalized = cleanText(value);
+
+  if (brand !== 'Henry') {
+    return '';
+  }
+
+  if (!henrySensorModels.has(normalized)) {
+    const error = new Error('Modelo Henry invalido. Use Sense ou Inteligente.');
+    error.status = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
+function lightSensorPayload(body) {
+  const brand = cleanLightSensorBrand(body.brand);
+
+  return {
+    clientName: cleanClientName(body.clientName),
+    hasProblem: cleanLightSensorProblem(body.hasProblem),
+    brand,
+    henryModel: cleanHenrySensorModel(body.henryModel, brand),
   };
 }
 
@@ -1630,6 +1700,112 @@ app.delete(
   asyncRoute(async (req, res) => {
     await query('DELETE FROM companies WHERE id = $1', [Number(req.params.id)]);
     broadcast({ table: 'companies', action: 'deleted', id: Number(req.params.id) });
+    res.status(204).end();
+  }),
+);
+
+app.get(
+  '/api/light-sensors',
+  asyncRoute(async (req, res) => {
+    const page = pageFromQuery(req.query.page);
+    const limit = limitFromQuery(req.query.limit);
+    const offset = (page - 1) * limit;
+    const params = [];
+    const whereParts = [];
+    const search = cleanText(req.query.search);
+
+    if (search) {
+      params.push(likeParam(search));
+      whereParts.push(`(
+        client_name LIKE $${params.length} COLLATE NOCASE
+        OR brand LIKE $${params.length} COLLATE NOCASE
+        OR henry_model LIKE $${params.length} COLLATE NOCASE
+      )`);
+    }
+
+    const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const total = await query(`SELECT COUNT(*) AS total FROM light_sensors ${where}`, params);
+    const { rows } = await query(
+      `SELECT *
+       FROM light_sensors
+       ${where}
+       ORDER BY client_name COLLATE NOCASE, id DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
+    );
+
+    res.json({
+      records: rows.map(lightSensorToJson),
+      total: Number(total.rows[0].total || 0),
+      page,
+      limit,
+    });
+  }),
+);
+
+app.get(
+  '/api/light-sensors/:id',
+  asyncRoute(async (req, res) => {
+    const { rows } = await query('SELECT * FROM light_sensors WHERE id = $1', [Number(req.params.id)]);
+
+    if (!rows[0]) {
+      const error = new Error('Sensor Luz nao encontrado.');
+      error.status = 404;
+      throw error;
+    }
+
+    res.json({ record: lightSensorToJson(rows[0]) });
+  }),
+);
+
+app.post(
+  '/api/light-sensors',
+  asyncRoute(async (req, res) => {
+    const payload = lightSensorPayload(req.body || {});
+    const { rows } = await query(
+      `INSERT INTO light_sensors (client_name, has_problem, brand, henry_model)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [payload.clientName, payload.hasProblem, payload.brand, payload.henryModel],
+    );
+    const record = lightSensorToJson(rows[0]);
+    broadcast({ table: 'light_sensors', action: 'created', id: record.id });
+    res.status(201).json({ record });
+  }),
+);
+
+app.put(
+  '/api/light-sensors/:id',
+  asyncRoute(async (req, res) => {
+    const payload = lightSensorPayload(req.body || {});
+    const { rows } = await query(
+      `UPDATE light_sensors
+       SET client_name = $2,
+           has_problem = $3,
+           brand = $4,
+           henry_model = $5
+       WHERE id = $1
+       RETURNING *`,
+      [Number(req.params.id), payload.clientName, payload.hasProblem, payload.brand, payload.henryModel],
+    );
+
+    if (!rows[0]) {
+      const error = new Error('Sensor Luz nao encontrado.');
+      error.status = 404;
+      throw error;
+    }
+
+    const record = lightSensorToJson(rows[0]);
+    broadcast({ table: 'light_sensors', action: 'updated', id: record.id });
+    res.json({ record });
+  }),
+);
+
+app.delete(
+  '/api/light-sensors/:id',
+  asyncRoute(async (req, res) => {
+    await query('DELETE FROM light_sensors WHERE id = $1', [Number(req.params.id)]);
+    broadcast({ table: 'light_sensors', action: 'deleted', id: Number(req.params.id) });
     res.status(204).end();
   }),
 );
@@ -2727,6 +2903,10 @@ app.get(
        SELECT DISTINCT client_name AS name
        FROM turnstiles
        WHERE client_name <> ''
+       UNION
+       SELECT DISTINCT client_name AS name
+       FROM light_sensors
+       WHERE client_name <> ''
        ORDER BY name
        LIMIT 500`,
     );
@@ -2773,7 +2953,7 @@ app.get(
     }
 
     const like = likeParam(search);
-    const [clients, correctives, commands, appointments, turnstiles, notes, companies] = await Promise.all([
+    const [clients, correctives, commands, appointments, turnstiles, notes, companies, lightSensors] = await Promise.all([
       query(
         `SELECT name
          FROM (
@@ -2786,6 +2966,8 @@ app.get(
            SELECT client_name AS name FROM appointments WHERE client_name <> ''
            UNION
            SELECT client_name AS name FROM turnstiles WHERE client_name <> ''
+           UNION
+           SELECT client_name AS name FROM light_sensors WHERE client_name <> ''
          )
          WHERE name LIKE $1 COLLATE NOCASE
          ORDER BY name
@@ -2851,6 +3033,16 @@ app.get(
          WHERE name LIKE $1 COLLATE NOCASE
             OR cnpj LIKE $1 COLLATE NOCASE
          ORDER BY name COLLATE NOCASE, id DESC
+         LIMIT 8`,
+        [like],
+      ),
+      query(
+        `SELECT id, client_name, has_problem, brand, henry_model
+         FROM light_sensors
+         WHERE client_name LIKE $1 COLLATE NOCASE
+            OR brand LIKE $1 COLLATE NOCASE
+            OR henry_model LIKE $1 COLLATE NOCASE
+         ORDER BY client_name COLLATE NOCASE, id DESC
          LIMIT 8`,
         [like],
       ),
@@ -2926,6 +3118,19 @@ app.get(
           id: Number(row.id),
           label: row.name || `Empresa #${row.id}`,
           description: [row.cnpj, row.system_name].filter(Boolean).join(' | ') || 'Cadastro de empresa',
+        })),
+      },
+      {
+        category: 'Sensor Luz',
+        type: 'lightSensor',
+        items: lightSensors.rows.map((row) => ({
+          id: Number(row.id),
+          label: row.client_name || `Sensor Luz #${row.id}`,
+          description: [
+            row.has_problem === 'sim' ? 'Com problema' : 'Sem problema',
+            row.brand,
+            row.henry_model,
+          ].filter(Boolean).join(' | ') || 'Sensor Luz',
         })),
       },
     ].filter((group) => group.items.length);

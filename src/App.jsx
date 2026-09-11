@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Archive,
@@ -16,6 +16,7 @@ import {
   Flame,
   Image as ImageIcon,
   LayoutDashboard,
+  Lightbulb,
   ListChecks,
   MonitorCheck,
   PieChart,
@@ -44,6 +45,7 @@ const tabs = [
   { id: 'turnstiles', label: 'Catracas para Montagem', icon: Wrench },
   { id: 'companies', label: 'Empresas', icon: Building2 },
   { id: 'notes', label: 'Anotacoes', icon: FileText },
+  { id: 'lightSensors', label: 'Sensor Luz', icon: Lightbulb },
 ];
 
 const healthOptions = ['Ok', 'Nulo'];
@@ -144,6 +146,13 @@ const emptyCompany = {
   notes: '',
 };
 
+const emptyLightSensor = {
+  clientName: '',
+  hasProblem: 'nao',
+  brand: 'Evo',
+  henryModel: '',
+};
+
 function formatDate(value) {
   if (!value) {
     return '-';
@@ -199,6 +208,14 @@ function normalizeTechnicianInput(value) {
   }
 
   return text;
+}
+
+function lightSensorBrandText(record) {
+  if (!record?.brand) {
+    return '-';
+  }
+
+  return record.brand === 'Henry' && record.henryModel ? `${record.brand} - ${record.henryModel}` : record.brand;
 }
 
 function fileToDataUrl(file) {
@@ -477,6 +494,181 @@ function DonutChart({ rows = [] }) {
   );
 }
 
+function DisplayModeView({ activeView, dashboard, appointments, turnstiles, selectedPeriod, onExit }) {
+  const viewTitle = {
+    dashboard: 'Dashboard',
+    appointments: 'Agendamentos',
+    turnstiles: 'Catracas para montagem',
+  }[activeView];
+
+  return (
+    <main className="display-mode-shell">
+      <header className="display-mode-header">
+        <div>
+          <div className="brand-row">
+            <Database size={25} />
+            <h1>Corretivas</h1>
+          </div>
+          <span>{viewTitle}</span>
+        </div>
+        <div className="display-mode-status">
+          <PeriodBadge period={selectedPeriod} />
+          <span>Modo de exibicao</span>
+          <button type="button" onClick={onExit} title="Sair do modo de exibicao (Esc)">
+            Esc para sair
+          </button>
+        </div>
+      </header>
+
+      {activeView === 'dashboard' && (
+        <section className="display-mode-content workspace">
+          <section className="stats-grid expanded">
+            {dashboardMetricTiles.map((tile) => (
+              <StatTile key={tile.metric} icon={tile.icon} label={tile.label} value={dashboard?.stats?.[tile.stat]} />
+            ))}
+          </section>
+
+          <section className="workspace dashboard-chart-grid">
+            <div className="dashboard-chart-column">
+              <div className="list-panel">
+                <div className="section-title">
+                  <h2>Atendimentos por cliente no mes</h2>
+                  <PieChart size={18} />
+                </div>
+                <DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
+              </div>
+            </div>
+            <div className="dashboard-chart-column">
+              <div className="list-panel">
+                <div className="section-title">
+                  <h2>Visitas por tipo</h2>
+                  <PieChart size={18} />
+                </div>
+                <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
+              </div>
+              <div className="list-panel">
+                <div className="section-title">
+                  <h2>Atividade operacional</h2>
+                  <BarChart3 size={18} />
+                </div>
+                <MiniBarChart rows={dashboard?.charts?.monthlyActivity || []} keys={['correctives', 'appointments']} />
+              </div>
+            </div>
+          </section>
+
+          <section className="list-panel">
+            <div className="section-title">
+              <h2>Proximas visitas agendadas</h2>
+            </div>
+            <div className="compact-list display-list">
+              {(dashboard?.lists?.upcomingAppointments || []).map((record) => (
+                <div key={record.id}>
+                  <strong>{record.clientName}</strong>
+                  <span>
+                    {formatDate(record.visitDate)} - {record.technician || 'Sem tecnico'}
+                  </span>
+                </div>
+              ))}
+              {!(dashboard?.lists?.upcomingAppointments || []).length && <EmptyState label="Nenhuma visita futura." />}
+            </div>
+          </section>
+        </section>
+      )}
+
+      {activeView === 'appointments' && (
+        <section className="display-mode-content list-panel display-table-panel">
+          <div className="section-title">
+            <h2>Visitas tecnicas cadastradas</h2>
+            <span className="counter">{appointments.length} registros</span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Cliente</th>
+                  <th>Endereco</th>
+                  <th>Problema</th>
+                  <th>Tecnico</th>
+                  <th>Tipo visita</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {appointments.map((record) => (
+                  <tr key={record.id}>
+                    <td>{formatDate(record.visitDate)}</td>
+                    <td>{record.clientName}</td>
+                    <td>{record.address || '-'}</td>
+                    <td className="long-cell">
+                      <div>{record.reportedProblem || '-'}</div>
+                      {record.notes && <small className="cell-note">Obs: {record.notes}</small>}
+                    </td>
+                    <td>{record.technician || '-'}</td>
+                    <td>{record.visitType || '-'}</td>
+                    <td><StatusPill value={record.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!appointments.length && <EmptyState label="Nenhum agendamento cadastrado." />}
+          </div>
+        </section>
+      )}
+
+      {activeView === 'turnstiles' && (
+        <section className="display-mode-content list-panel display-table-panel">
+          <div className="section-title">
+            <h2>Catracas para montagem cadastradas</h2>
+            <span className="counter">{turnstiles.length} registros</span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Modelo</th>
+                  <th>Endereco</th>
+                  <th>Entrega</th>
+                  <th>Status</th>
+                  <th>Urgencia</th>
+                  <th>Prazo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {turnstiles.map((record) => (
+                  <tr key={record.id} className={`due-${record.dueStatus} urgency-${record.urgencyStatus || 'yellow'}`}>
+                    <td>{record.clientName}</td>
+                    <td>{record.model || '-'}</td>
+                    <td>{record.clientAddress || '-'}</td>
+                    <td>{formatDate(record.expectedDeliveryDate)}</td>
+                    <td><StatusPill value={record.status} /></td>
+                    <td><TurnstileUrgencyPill record={record} /></td>
+                    <td>
+                      <StatusPill
+                        value={
+                          record.dueStatus === 'overdue'
+                            ? 'Vencido'
+                            : record.dueStatus === 'soon'
+                              ? 'Proximo'
+                              : record.dueStatus === 'completed'
+                                ? 'Concluido'
+                                : 'Normal'
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!turnstiles.length && <EmptyState label="Nenhuma catraca cadastrada." />}
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}
+
 function GlobalSearch({ onOpen, showToast }) {
   const [term, setTerm] = useState('');
   const [groups, setGroups] = useState([]);
@@ -594,6 +786,11 @@ function NotificationCenter({ notifications, onOpen, onReadAll }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [displayMode, setDisplayMode] = useState(false);
+  const [displayModeTabIndex, setDisplayModeTabIndex] = useState(0);
+  const [displayModeLoading, setDisplayModeLoading] = useState(false);
+  const [displayModeRecords, setDisplayModeRecords] = useState({ appointments: [], turnstiles: [] });
+  const lastActiveTabRef = useRef('dashboard');
   const [periods, setPeriods] = useState([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState('');
   const [dashboard, setDashboard] = useState(null);
@@ -667,6 +864,13 @@ export default function App() {
   const [companiesSearch, setCompaniesSearch] = useState('');
   const [companyForm, setCompanyForm] = useState(emptyCompany);
   const [editingCompanyId, setEditingCompanyId] = useState(null);
+
+  const [lightSensors, setLightSensors] = useState([]);
+  const [lightSensorsTotal, setLightSensorsTotal] = useState(0);
+  const [lightSensorsPage, setLightSensorsPage] = useState(1);
+  const [lightSensorsSearch, setLightSensorsSearch] = useState('');
+  const [lightSensorForm, setLightSensorForm] = useState(emptyLightSensor);
+  const [editingLightSensorId, setEditingLightSensorId] = useState(null);
 
   const [technicians, setTechnicians] = useState([]);
   const [techniciansTotal, setTechniciansTotal] = useState(0);
@@ -887,6 +1091,19 @@ export default function App() {
     setCompaniesTotal(data.total || 0);
   }, [companiesPage, companiesSearch]);
 
+  const loadLightSensors = useCallback(async () => {
+    const params = new URLSearchParams({ page: String(lightSensorsPage), limit: String(pageSize) });
+
+    if (lightSensorsSearch.trim()) {
+      params.set('search', lightSensorsSearch.trim());
+    }
+
+    const suffix = params.toString() ? `?${params}` : '';
+    const data = await request(`/api/light-sensors${suffix}`);
+    setLightSensors(data.records);
+    setLightSensorsTotal(data.total || 0);
+  }, [lightSensorsPage, lightSensorsSearch]);
+
   const loadTurnstiles = useCallback(async () => {
     const params = new URLSearchParams({ page: String(turnstilesPage), limit: String(pageSize) });
 
@@ -955,6 +1172,21 @@ export default function App() {
     setMonthlyReport(data);
   }, [monthlyReportMonth]);
 
+  const loadAllDisplayRecords = useCallback(async (path) => {
+    const firstPage = await request(`${path}?page=1&limit=200`);
+    const totalPages = Math.max(1, Math.ceil(Number(firstPage.total || 0) / Number(firstPage.limit || 200)));
+
+    if (totalPages === 1) {
+      return firstPage.records || [];
+    }
+
+    const remainingPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) => request(`${path}?page=${index + 2}&limit=200`)),
+    );
+
+    return [firstPage, ...remainingPages].flatMap((page) => page.records || []);
+  }, []);
+
   useEffect(() => {
     const source = eventSource();
     source.addEventListener('change', () => setRefreshKey((current) => current + 1));
@@ -984,6 +1216,7 @@ export default function App() {
       loadTurnstiles(),
       loadSystemNotes(),
       loadCompanies(),
+      loadLightSensors(),
       loadTechnicians(),
       loadDailyReport(),
       loadMonthlyReport(),
@@ -1001,6 +1234,7 @@ export default function App() {
     loadTurnstiles,
     loadSystemNotes,
     loadCompanies,
+    loadLightSensors,
     loadTechnicians,
     loadDailyReport,
     loadMonthlyReport,
@@ -1033,6 +1267,10 @@ export default function App() {
   }, [companiesSearch]);
 
   useEffect(() => {
+    setLightSensorsPage(1);
+  }, [lightSensorsSearch]);
+
+  useEffect(() => {
     setTurnstilesPage(1);
   }, [turnstilesSearch, turnstilesStatus, turnstilesStartDate, turnstilesEndDate]);
 
@@ -1043,6 +1281,69 @@ export default function App() {
   useEffect(() => {
     setDailyReportPage(1);
   }, [dailyStartDate, dailyEndDate]);
+
+  useEffect(() => {
+    if (!displayMode) {
+      return undefined;
+    }
+
+    const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
+    setActiveTab(displayTabs[displayModeTabIndex]);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+
+    let frameId;
+    let startTimer;
+    let nextTabTimer;
+    let cancelled = false;
+
+    const scrollSlowly = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+
+      if (window.scrollY >= maximumScroll - 2) {
+        nextTabTimer = window.setTimeout(() => {
+          if (!cancelled) {
+            setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+          }
+        }, 3000);
+        return;
+      }
+
+      window.scrollBy({ top: 0.7, left: 0, behavior: 'auto' });
+      frameId = window.requestAnimationFrame(scrollSlowly);
+    };
+
+    startTimer = window.setTimeout(() => {
+      frameId = window.requestAnimationFrame(scrollSlowly);
+    }, 850);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+      window.clearTimeout(nextTabTimer);
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [displayMode, displayModeTabIndex]);
+
+  useEffect(() => {
+    if (!displayMode) {
+      return undefined;
+    }
+
+    const exitOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        setDisplayMode(false);
+        setActiveTab(lastActiveTabRef.current);
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      }
+    };
+
+    window.addEventListener('keydown', exitOnEscape);
+    return () => window.removeEventListener('keydown', exitOnEscape);
+  }, [displayMode]);
 
   function updateCorrective(field, value) {
     const normalizedValue = field === 'client'
@@ -1094,6 +1395,23 @@ export default function App() {
 
   function updateCompany(field, value) {
     setCompanyForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateLightSensor(field, value) {
+    const normalizedValue = field === 'clientName' ? normalizeClientInput(value) : value;
+    setLightSensorForm((current) => {
+      const next = { ...current, [field]: normalizedValue };
+
+      if (field === 'brand' && normalizedValue !== 'Henry') {
+        next.henryModel = '';
+      }
+
+      if (field === 'brand' && normalizedValue === 'Henry' && !next.henryModel) {
+        next.henryModel = 'Sense';
+      }
+
+      return next;
+    });
   }
 
   async function refreshOperationalData() {
@@ -1238,6 +1556,22 @@ export default function App() {
       setEditingCompanyId(null);
       await loadCompanies();
       showToast(editingCompanyId ? 'Empresa atualizada.' : 'Empresa cadastrada.');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  }
+
+  async function saveLightSensor(event) {
+    event.preventDefault();
+    const method = editingLightSensorId ? 'PUT' : 'POST';
+    const path = editingLightSensorId ? `/api/light-sensors/${editingLightSensorId}` : '/api/light-sensors';
+
+    try {
+      await request(path, { method, body: lightSensorForm });
+      setLightSensorForm(emptyLightSensor);
+      setEditingLightSensorId(null);
+      await loadLightSensors();
+      showToast(editingLightSensorId ? 'Sensor Luz atualizado.' : 'Sensor Luz cadastrado.');
     } catch (error) {
       showToast(error.message, 'error');
     }
@@ -1409,6 +1743,20 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function editLightSensor(record) {
+    setEditingLightSensorId(record.id);
+    setLightSensorForm(
+      normalizeForForm({
+        clientName: record.clientName,
+        hasProblem: record.hasProblem || 'nao',
+        brand: record.brand || 'Evo',
+        henryModel: record.brand === 'Henry' ? record.henryModel || 'Sense' : '',
+      }),
+    );
+    setActiveTab('lightSensors');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   async function openClientHistory(name) {
     try {
       const data = await request(`/api/clients/history?name=${encodeURIComponent(name)}`);
@@ -1483,6 +1831,12 @@ export default function App() {
       if (item.type === 'company') {
         const data = await request(`/api/companies/${item.id}`);
         editCompany(data.record);
+        return;
+      }
+
+      if (item.type === 'lightSensor') {
+        const data = await request(`/api/light-sensors/${item.id}`);
+        editLightSensor(data.record);
       }
     } catch (error) {
       showToast(error.message, 'error');
@@ -1648,6 +2002,32 @@ export default function App() {
     }
   }
 
+  async function startDisplayMode() {
+    setDisplayModeLoading(true);
+
+    try {
+      const [displayAppointments, displayTurnstiles] = await Promise.all([
+        loadAllDisplayRecords('/api/appointments'),
+        loadAllDisplayRecords('/api/turnstiles'),
+      ]);
+
+      lastActiveTabRef.current = activeTab;
+      setDisplayModeRecords({ appointments: displayAppointments, turnstiles: displayTurnstiles });
+      setDisplayModeTabIndex(0);
+      setDisplayMode(true);
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setDisplayModeLoading(false);
+    }
+  }
+
+  function exitDisplayMode() {
+    setDisplayMode(false);
+    setActiveTab(lastActiveTabRef.current);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }
+
   if (loading) {
     return (
       <main className="app-shell">
@@ -1656,6 +2036,19 @@ export default function App() {
           <span>Carregando Corretivas</span>
         </div>
       </main>
+    );
+  }
+
+  if (displayMode) {
+    return (
+      <DisplayModeView
+        activeView={['dashboard', 'appointments', 'turnstiles'][displayModeTabIndex]}
+        dashboard={dashboard}
+        appointments={displayModeRecords.appointments}
+        turnstiles={displayModeRecords.turnstiles}
+        selectedPeriod={selectedPeriod}
+        onExit={exitDisplayMode}
+      />
     );
   }
 
@@ -1916,6 +2309,17 @@ export default function App() {
                 ))}
               </div>
             </div>
+          </section>
+
+          <section className="display-mode-launch">
+            <div>
+              <h2>Modo de exibicao</h2>
+              <p>Apresenta somente os dados cadastrados e alterna automaticamente entre Dashboard, Agendamentos e Catracas para montagem.</p>
+            </div>
+            <button className="primary-button" type="button" onClick={startDisplayMode} disabled={displayModeLoading}>
+              {displayModeLoading ? <RefreshCw className="spin" size={18} /> : <MonitorCheck size={18} />}
+              {displayModeLoading ? 'Preparando exibicao' : 'Ativar modo de exibicao'}
+            </button>
           </section>
         </section>
       )}
@@ -2828,6 +3232,122 @@ export default function App() {
               {!systemNotes.length && <EmptyState label="Nenhuma anotacao cadastrada." />}
             </div>
             <Pagination page={systemNotesPage} total={systemNotesTotal} onPageChange={setSystemNotesPage} />
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'lightSensors' && (
+        <section className="workspace two-column">
+          <form className="entry-panel compact-panel" onSubmit={saveLightSensor}>
+            <div className="section-title">
+              <h2>{editingLightSensorId ? 'Editar Sensor Luz' : 'Novo Sensor Luz'}</h2>
+              {editingLightSensorId && (
+                <IconAction
+                  title="Cancelar edicao"
+                  onClick={() => {
+                    setEditingLightSensorId(null);
+                    setLightSensorForm(emptyLightSensor);
+                  }}
+                >
+                  <X size={18} />
+                </IconAction>
+              )}
+            </div>
+            <div className="form-grid single-column">
+              <Field label="Cliente">
+                <input
+                  list="client-list"
+                  value={lightSensorForm.clientName}
+                  onChange={(event) => updateLightSensor('clientName', event.target.value)}
+                />
+              </Field>
+              <Field label="Com problema">
+                <select value={lightSensorForm.hasProblem} onChange={(event) => updateLightSensor('hasProblem', event.target.value)}>
+                  <option value="nao">Nao</option>
+                  <option value="sim">Sim</option>
+                </select>
+              </Field>
+              <Field label="Marca">
+                <select value={lightSensorForm.brand} onChange={(event) => updateLightSensor('brand', event.target.value)}>
+                  <option value="Evo">Evo</option>
+                  <option value="Henry">Henry</option>
+                </select>
+              </Field>
+              {lightSensorForm.brand === 'Henry' && (
+                <Field label="Tipo Henry">
+                  <select value={lightSensorForm.henryModel} onChange={(event) => updateLightSensor('henryModel', event.target.value)}>
+                    <option value="Sense">Sense</option>
+                    <option value="Inteligente">Inteligente</option>
+                  </select>
+                </Field>
+              )}
+            </div>
+            <div className="form-actions">
+              <button className="primary-button" type="submit">
+                <Save size={18} />
+                {editingLightSensorId ? 'Salvar edicao' : 'Cadastrar Sensor Luz'}
+              </button>
+            </div>
+          </form>
+
+          <div className="list-panel">
+            <div className="section-title">
+              <h2>Sensores de luz cadastrados</h2>
+            </div>
+            <div className="toolbar">
+              <div className="search-box">
+                <Search size={17} />
+                <input
+                  placeholder="Buscar cliente ou marca"
+                  value={lightSensorsSearch}
+                  onChange={(event) => setLightSensorsSearch(event.target.value)}
+                />
+              </div>
+              <span className="counter">{lightSensorsTotal} registros</span>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Com problema</th>
+                    <th>Marca</th>
+                    <th>Atualizado</th>
+                    <th className="actions-heading">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lightSensors.map((record) => (
+                    <tr key={record.id}>
+                      <td>
+                        <button className="text-link" type="button" onClick={() => openClientHistory(record.clientName)}>
+                          {record.clientName || '-'}
+                        </button>
+                      </td>
+                      <td>
+                        <StatusPill value={record.hasProblem === 'sim' ? 'Sim' : 'Nao'} />
+                      </td>
+                      <td>{lightSensorBrandText(record)}</td>
+                      <td>{record.updatedAt ? new Date(record.updatedAt).toLocaleString('pt-BR') : '-'}</td>
+                      <td className="row-actions">
+                        <IconAction title="Editar" onClick={() => editLightSensor(record)}>
+                          <Edit3 size={17} />
+                        </IconAction>
+                        <IconAction
+                          title="Excluir"
+                          danger
+                          onClick={() => deleteRecord(`/api/light-sensors/${record.id}`, loadLightSensors, 'sensor luz')}
+                        >
+                          <Trash2 size={17} />
+                        </IconAction>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!lightSensors.length && <EmptyState label="Nenhum Sensor Luz cadastrado." />}
+            </div>
+            <Pagination page={lightSensorsPage} total={lightSensorsTotal} onPageChange={setLightSensorsPage} />
           </div>
         </section>
       )}

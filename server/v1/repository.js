@@ -122,6 +122,17 @@ const resources = {
       notes: 'notes',
     },
   },
+  sensor_luz: {
+    table: 'light_sensors',
+    collection: 'sensor_luz',
+    clientFields: ['clientName'],
+    fields: {
+      clientName: 'client_name',
+      hasProblem: 'has_problem',
+      brand: 'brand',
+      henryModel: 'henry_model',
+    },
+  },
   auditoria: {
     table: 'audit_logs',
     collection: 'auditoria',
@@ -331,6 +342,34 @@ function normalizePayload(body, config) {
       error.status = 400;
       throw error;
     }
+  }
+
+  if (config.table === 'light_sensors') {
+    const hasProblem = String(normalized.hasProblem || '').trim().toLowerCase() || 'nao';
+    const brand = String(normalized.brand || '').trim();
+    const henryModel = String(normalized.henryModel || '').trim();
+
+    if (hasProblem !== 'sim' && hasProblem !== 'nao') {
+      const error = new Error('Opcao de problema invalida. Use sim ou nao.');
+      error.status = 400;
+      throw error;
+    }
+
+    if (brand && brand !== 'Evo' && brand !== 'Henry') {
+      const error = new Error('Marca invalida. Use Evo ou Henry.');
+      error.status = 400;
+      throw error;
+    }
+
+    if (brand === 'Henry' && henryModel !== 'Sense' && henryModel !== 'Inteligente') {
+      const error = new Error('Modelo Henry invalido. Use Sense ou Inteligente.');
+      error.status = 400;
+      throw error;
+    }
+
+    normalized.hasProblem = hasProblem;
+    normalized.brand = brand;
+    normalized.henryModel = brand === 'Henry' ? henryModel : '';
   }
 
   return normalized;

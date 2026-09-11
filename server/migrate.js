@@ -239,6 +239,17 @@ const schema = [
   )`,
   `CREATE INDEX IF NOT EXISTS companies_name_cnpj_idx
     ON companies (name COLLATE NOCASE, cnpj COLLATE NOCASE, id DESC)`,
+  `CREATE TABLE IF NOT EXISTS light_sensors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_name TEXT NOT NULL DEFAULT '',
+    has_problem TEXT NOT NULL DEFAULT 'nao' CHECK (has_problem IN ('sim', 'nao')),
+    brand TEXT NOT NULL DEFAULT '',
+    henry_model TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS light_sensors_client_idx
+    ON light_sensors (client_name COLLATE NOCASE, id DESC)`,
   `CREATE TRIGGER IF NOT EXISTS periods_set_updated_at
     AFTER UPDATE ON periods
     FOR EACH ROW
@@ -315,6 +326,13 @@ const schema = [
     WHEN NEW.updated_at = OLD.updated_at
     BEGIN
       UPDATE companies SET updated_at = datetime('now') WHERE id = NEW.id;
+    END`,
+  `CREATE TRIGGER IF NOT EXISTS light_sensors_set_updated_at
+    AFTER UPDATE ON light_sensors
+    FOR EACH ROW
+    WHEN NEW.updated_at = OLD.updated_at
+    BEGIN
+      UPDATE light_sensors SET updated_at = datetime('now') WHERE id = NEW.id;
     END`,
 ];
 
@@ -472,6 +490,7 @@ async function normalizeExistingNames() {
   await normalizeTextColumn('command_registrations', 'bakery', normalizeClientText);
   await normalizeTextColumn('appointments', 'client_name', normalizeClientText);
   await normalizeTextColumn('turnstiles', 'client_name', normalizeClientText);
+  await normalizeTextColumn('light_sensors', 'client_name', normalizeClientText);
 
   await normalizeTextColumn('technicians', 'name', normalizeTechnicianText);
   await normalizeTextColumn('corrective_occurrences', 'technician', normalizeTechnicianText);
@@ -498,6 +517,7 @@ export async function migrate() {
   await ensureColumn('appointments', 'annotations', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('appointments', 'visit_type', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn('turnstiles', 'status_updated_at', 'TEXT');
+  await ensureColumn('light_sensors', 'henry_model', "TEXT NOT NULL DEFAULT ''");
   await query(
     `UPDATE turnstiles
      SET status_updated_at = COALESCE(created_at, updated_at, datetime('now'))
