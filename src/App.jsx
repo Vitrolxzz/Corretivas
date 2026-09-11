@@ -63,6 +63,7 @@ const noChargeAppointmentVisitTypes = new Set(['garantia', 'retorno']);
 const turnstileStatuses = ['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue'];
 const systemNoteAuthors = ['Valquíria', 'Thiago', 'Lucas', 'Rubens', 'Vittor', 'Daniel A.', 'Daniel'];
 const pageSize = 50;
+const appointmentsPageSize = 15;
 const dashboardMetricTiles = [
   { metric: 'todayAppointments', icon: CalendarDays, label: 'Agendamentos do dia', stat: 'todayAppointments' },
   { metric: 'upcomingAppointments', icon: CalendarDays, label: 'Proximas visitas', stat: 'upcomingAppointments' },
@@ -895,7 +896,7 @@ export default function App() {
   const activePeriod = useMemo(() => periods.find((period) => period.status === 'active') || null, [periods]);
   const periodWritable = selectedPeriod?.status === 'active';
   const totalCorrectivePages = Math.max(1, Math.ceil(correctivesTotal / pageSize));
-  const totalAppointmentPages = Math.max(1, Math.ceil(appointmentsTotal / pageSize));
+  const totalAppointmentPages = Math.max(1, Math.ceil(appointmentsTotal / appointmentsPageSize));
 
   const appointmentExportParams = {
     search: appointmentsSearch,
@@ -1027,7 +1028,7 @@ export default function App() {
   }, [selectedPeriodId, commandsPage, commandSearch]);
 
   const loadAppointments = useCallback(async () => {
-    const params = new URLSearchParams({ page: String(appointmentsPage), limit: String(pageSize) });
+    const params = new URLSearchParams({ page: String(appointmentsPage), limit: String(appointmentsPageSize) });
 
     if (appointmentsSearch.trim()) {
       params.set('search', appointmentsSearch.trim());
