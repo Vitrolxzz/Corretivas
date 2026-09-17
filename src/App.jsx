@@ -535,8 +535,17 @@ function DonutChart({ rows = [] }) {
 }
 
 function DisplayModeView({ activeView, dashboard, appointments, turnstiles, selectedPeriod, onExit }) {
-  // 1. Estado para controlar a seleção de 1 mês ou 6 meses
-  const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
+	// 1. Estado para controlar a seleção de 1 mês ou 6 meses
+	const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
+
+	// Alterna automaticamente a cada 5 segundos no Modo de Exibição
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
+		}, 5000);
+
+		return () => clearInterval(interval);
+	}, []);
 
   const viewTitle = {
     dashboard: 'Dashboard',
@@ -999,6 +1008,14 @@ export default function App() {
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [clientHistory, setClientHistory] = useState(null);
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
+
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
+		}, 5000);
+
+		return () => clearInterval(interval);
+	}, []);
 
   const recurrenceChartData = useMemo(() => {
     const now = new Date();
