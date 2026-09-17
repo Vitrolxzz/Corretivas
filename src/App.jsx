@@ -934,6 +934,40 @@ export default function App() {
   const [monthlyReportMonth, setMonthlyReportMonth] = useState(currentMonth());
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [clientHistory, setClientHistory] = useState(null);
+  const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
+
+  const recurrenceChartData = useMemo(() => {
+    const now = new Date();
+    const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
+    
+    const cutoffDate = new Date();
+    cutoffDate.setMonth(now.getMonth() - monthsCutoff);
+
+    const filtered = appointments.filter((item) => {
+      if (!item.visitDate) return false;
+      const itemDate = new Date(item.visitDate);
+      return itemDate >= cutoffDate && itemDate <= now;
+    });
+
+    const counts = {};
+    filtered.forEach((item) => {
+      const name = item.clientName || 'Não identificado';
+      counts[name] = (counts[name] || 0) + 1;
+    });
+
+    const total = filtered.length;
+    if (!total) return [];
+
+    return Object.entries(counts)
+      .map(([label, value]) => ({
+        label,
+        value,
+        percent: Math.round((value / total) * 100),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [appointments, recurrencePeriod]);
+  // === FIM DO BLOCO ===
 
   const selectedPeriod = useMemo(
     () => periods.find((period) => String(period.id) === String(selectedPeriodId)) || null,
