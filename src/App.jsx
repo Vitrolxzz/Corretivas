@@ -943,7 +943,7 @@ export default function App() {
     const cutoffDate = new Date();
     cutoffDate.setmonth(now.getMonth() - monthsCutoff);
     const filtered = (appointments || []).filter((item) => {
-      const rawDate = item.visitDate || item visit_date;
+      const rawDate = item.visitDate || item.visit_date;
       if (!rawDate) return false;
 
       const itemDate = new Date(rawDate);
