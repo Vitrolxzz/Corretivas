@@ -183,6 +183,45 @@ function formatMoney(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function getPreviousBusinessDay(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() - 1);
+  while (d.getDay() === 0 || d.getDay() === 6) { // 0 = Domingo, 6 = Sábado
+    d.setDate(d.getDate() - 1);
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+function getNextBusinessDay(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0 || d.getDay() === 6) { // 0 = Domingo, 6 = Sábado
+    d.setDate(d.getDate() + 1);
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+function getDisplayModeAppointments(appointments) {
+  const todayObj = new Date();
+  
+  // Se hoje for sábado ou domingo, ajusta para a sexta-feira anterior como referência
+  while (todayObj.getDay() === 0 || todayObj.getDay() === 6) {
+    todayObj.setDate(todayObj.getDate() - 1);
+  }
+
+  const today = todayObj.toISOString().slice(0, 10);
+  const prevBusinessDay = getPreviousBusinessDay(todayObj);
+  const nextBusinessDay = getNextBusinessDay(todayObj);
+
+  const allowedDates = new Set([prevBusinessDay, today, nextBusinessDay]);
+
+  return appointments.filter((record) => {
+    if (!record.visitDate) return false;
+    const recordDate = String(record.visitDate).trim().slice(0, 10);
+    return allowedDates.has(recordDate);
+  });
+}
+
 function isNoChargeAppointment(value) {
   return noChargeAppointmentVisitTypes.has(String(value || '').trim().toLowerCase());
 }
@@ -502,6 +541,11 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
     turnstiles: 'Catracas para montagem',
   }[activeView];
 
+  // Filtra apenas os agendamentos do dia anterior útil, dia atual e próximo dia útil
+  const filteredAppointments = useMemo(() => {
+    return getDisplayModeAppointments(appointments);
+  }, [appointments]);
+
   return (
     <main className="display-mode-shell">
       <header className="display-mode-header">
@@ -579,8 +623,8 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
       {activeView === 'appointments' && (
         <section className="display-mode-content list-panel display-table-panel">
           <div className="section-title">
-            <h2>Visitas tecnicas cadastradas</h2>
-            <span className="counter">{appointments.length} registros</span>
+            <h2>Visitas técnicas dos dias úteis (Anterior, Hoje e Próximo)</h2>
+            <span className="counter">{filteredAppointments.length} registros</span>
           </div>
           <div className="table-wrap">
             <table>
@@ -596,7 +640,7 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
                 </tr>
               </thead>
               <tbody>
-                {appointments.map((record) => (
+                {filteredAppointments.map((record) => (
                   <tr key={record.id}>
                     <td>{formatDate(record.visitDate)}</td>
                     <td>{record.clientName}</td>
@@ -612,7 +656,9 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
                 ))}
               </tbody>
             </table>
-            {!appointments.length && <EmptyState label="Nenhum agendamento cadastrado." />}
+            {!filteredAppointments.length && (
+              <EmptyState label="Nenhum agendamento encontrado para o dia anterior útil, hoje ou próximo dia útil." />
+            )}
           </div>
         </section>
       )}
