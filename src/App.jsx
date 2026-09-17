@@ -2259,64 +2259,66 @@ export default function App() {
           )}
 
           <section className="workspace dashboard-chart-grid">
-            <div className="dashboard-chart-column">
-              <div className="list-panel">
-                <div className="section-title">
-                  <h2>Atendimentos por cliente no mes</h2>
-                  <PieChart size={18} />
-                </div>
-                <DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
-              </div>
-            </div>
+						{/* COLUNA DA ESQUERDA */}
+						<div className="dashboard-chart-column">
+							<div className="list-panel">
+								<div className="section-title">
+									<h2>Atendimentos por cliente no mes</h2>
+									<PieChart size={18} />
+								</div>
+								<DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
+							</div>
 
-            <div className="dashboard-chart-column">
-              <div className="list-panel">
-                <div className="section-title">
-                  <h2>Visitas por tipo</h2>
-                  <PieChart size={18} />
-                </div>
-                <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
-              </div>
+							{/* GRÁFICO MOVIDO PARA A ESQUERDA */}
+							<div className="list-panel">
+								<div className="section-title">
+									<div>
+										<h2>Recorrência de Atendimentos</h2>
+										<small style={{ color: 'var(--muted)', fontSize: '12px', display: 'block', marginTop: '2px' }}>
+											Agendamentos ({recurrencePeriod === '1m' ? 'Último Mês' : 'Últimos 6 Meses'})
+										</small>
+									</div>
 
-              {/* NOVO GRÁFICO DE RECORRÊNCIA */}
-              <div className="list-panel">
-                <div className="section-title">
-                  <div>
-                    <h2>Recorrência de Atendimentos</h2>
-                    <small style={{ color: 'var(--muted)', fontSize: '12px', display: 'block', marginTop: '2px' }}>
-                      Agendamentos ({recurrencePeriod === '1m' ? 'Último Mês' : 'Últimos 6 Meses'})
-                    </small>
-                  </div>
+									<div className="segmented">
+										<button
+											className={recurrencePeriod === '1m' ? 'active' : ''}
+											type="button"
+											onClick={() => setRecurrencePeriod('1m')}
+										>
+											1m
+										</button>
+										<button
+											className={recurrencePeriod === '6m' ? 'active' : ''}
+											type="button"
+											onClick={() => setRecurrencePeriod('6m')}
+										>
+											6m
+										</button>
+									</div>
+								</div>
+								<DonutChart rows={recurrenceChartData} />
+							</div>
+						</div>
 
-                  <div className="segmented">
-                    <button
-                      className={recurrencePeriod === '1m' ? 'active' : ''}
-                      type="button"
-                      onClick={() => setRecurrencePeriod('1m')}
-                    >
-                      1m
-                    </button>
-                    <button
-                      className={recurrencePeriod === '6m' ? 'active' : ''}
-                      type="button"
-                      onClick={() => setRecurrencePeriod('6m')}
-                    >
-                      6m
-                    </button>
-                  </div>
-                </div>
-                <DonutChart rows={recurrenceChartData} />
-              </div>
+						{/* COLUNA DA DIREITA */}
+						<div className="dashboard-chart-column">
+							<div className="list-panel">
+								<div className="section-title">
+									<h2>Visitas por tipo</h2>
+									<PieChart size={18} />
+								</div>
+								<DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
+							</div>
 
-              <div className="list-panel">
-                <div className="section-title">
-                  <h2>Atividade operacional</h2>
-                  <BarChart3 size={18} />
-                </div>
-                <MiniBarChart rows={dashboard?.charts?.monthlyActivity || []} keys={['correctives', 'appointments']} />
-              </div>
-            </div>
-          </section>
+							<div className="list-panel">
+								<div className="section-title">
+									<h2>Atividade operacional</h2>
+									<BarChart3 size={18} />
+								</div>
+								<MiniBarChart rows={dashboard?.charts?.monthlyActivity || []} keys={['correctives', 'appointments']} />
+							</div>
+						</div>
+					</section>
 
           <section className="workspace two-column dashboard-grid">
             <div className="list-panel">
