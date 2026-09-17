@@ -934,6 +934,39 @@ export default function App() {
   const [monthlyReportMonth, setMonthlyReportMonth] = useState(currentMonth());
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [clientHistory, setClientHistory] = useState(null);
+  const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
+
+  const recurrenceChartData = useMemo(() => {
+    const now = new Date();
+    const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
+
+    const cutoffDate = new Date();
+    cutoffDate.setmonth(now.getMonth() - monthsCutoff);
+    const filtered = (appointments || []).filter((item) => {
+      const rawDate = item.visitDate || item visit_date;
+      if (!rawDate) return false;
+
+      const itemDate = new Date(rawDate);
+      return itemDate >= cutoffDate && itemDate <= now;
+    });
+
+    const counts = {};
+    filtered.forEach((item) => {
+      const name = item.clientName || item.client_name || item.client || 'Não identificado';
+    });
+
+    const total - filtered.length;
+    if (!total) return [];
+
+    return Object.entries(counts)
+      .map(([label, value]) => ({
+        label,
+        value,
+        percent: Math.round((value / total) * 100),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [appointments, recurrencePeriod]);
 
   const selectedPeriod = useMemo(
     () => periods.find((period) => String(period.id) === String(selectedPeriodId)) || null,
@@ -2241,6 +2274,36 @@ export default function App() {
                   <PieChart size={18} />
                 </div>
                 <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
+              </div>
+
+              {/* NOVO GRÁFICO DE RECORRÊNCIA */}
+              <div className="list-panel">
+                <div className="section-title">
+                  <div>
+                    <h2>Recorrência de Atendimentos</h2>
+                    <small style={{ color: 'var(--muted)', fontSize: '12px', display: 'block', marginTop: '2px' }}>
+                      Agendamentos ({recurrencePeriod === '1m' ? 'Último Mês' : 'Últimos 6 Meses'})
+                    </small>
+                  </div>
+
+                  <div className="segmented">
+                    <button
+                      className={recurrencePeriod === '1m' ? 'active' : ''}
+                      type="button"
+                      onClick={() => setRecurrencePeriod('1m')}
+                    >
+                      1m
+                    </button>
+                    <button
+                      className={recurrencePeriod === '6m' ? 'active' : ''}
+                      type="button"
+                      onClick={() => setRecurrencePeriod('6m')}
+                    >
+                      6m
+                    </button>
+                  </div>
+                </div>
+                <DonutChart rows={recurrenceChartData} />
               </div>
 
               <div className="list-panel">
