@@ -974,25 +974,31 @@ export default function App() {
   const recurrenceChartData = useMemo(() => {
     const now = new Date();
     const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
-    
+  
     const cutoffDate = new Date();
     cutoffDate.setMonth(now.getMonth() - monthsCutoff);
-
-    const filtered = appointments.filter((item) => {
-      if (!item.visitDate) return false;
-      const itemDate = new Date(item.visitDate);
+  
+    // 1. Filtra agendamentos no período
+    const filtered = (appointments || []).filter((item) => {
+      // Aceita tanto visitDate quanto visit_date
+      const rawDate = item.visitDate || item.visit_date;
+      if (!rawDate) return false;
+      
+      const itemDate = new Date(rawDate);
       return itemDate >= cutoffDate && itemDate <= now;
     });
-
+  
+    // 2. Agrupa por cliente
     const counts = {};
     filtered.forEach((item) => {
-      const name = item.clientName || 'Não identificado';
+      const name = item.clientName || item.client_name || item.client || 'Não identificado';
       counts[name] = (counts[name] || 0) + 1;
     });
-
+  
     const total = filtered.length;
     if (!total) return [];
-
+  
+    // 3. Formata para o DonutChart
     return Object.entries(counts)
       .map(([label, value]) => ({
         label,
@@ -1002,7 +1008,7 @@ export default function App() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
   }, [appointments, recurrencePeriod]);
-  // === FIM DO BLOCO ===
+    // === FIM DO BLOCO ===
 
   const selectedPeriod = useMemo(
     () => periods.find((period) => String(period.id) === String(selectedPeriodId)) || null,
