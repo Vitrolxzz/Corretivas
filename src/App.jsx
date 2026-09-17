@@ -535,11 +535,54 @@ function DonutChart({ rows = [] }) {
 }
 
 function DisplayModeView({ activeView, dashboard, appointments, turnstiles, selectedPeriod, onExit }) {
+  // 1. Estado para controlar a seleção de 1 mês ou 6 meses
+  const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
+
   const viewTitle = {
     dashboard: 'Dashboard',
     appointments: 'Agendamentos',
     turnstiles: 'Catracas para montagem',
   }[activeView];
+
+  // 2. Cálculo do gráfico de Recorrência usando a lista de agendamentos do Modo de Exibição
+  const recurrenceChartData = useMemo(() => {
+    const now = new Date();
+    const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
+
+    const cutoffDate = new Date();
+    cutoffDate.setMonth(now.getMonth() - monthsCutoff);
+
+    // Filtra agendamentos pelo período
+    const filtered = (appointments || []).filter((item) => {
+      const rawDate = item.visitDate || item.visit_date;
+      if (!rawDate) return false;
+
+      const itemDate = new Date(rawDate);
+      return itemDate >= cutoffDate && itemDate <= now;
+    });
+
+    // Contagem de atendimentos por cliente
+    const counts = {};
+    filtered.forEach((item) => {
+      const name = item.clientName || item.client_name || item.client || 'Não identificado';
+      counts[name] = (counts[name] || 0) + 1;
+    });
+
+    const total = filtered.length;
+    if (!total) return [];
+
+    // Formata o array para renderizar as barras (Top 10 clientes)
+    return Object.entries(counts)
+      .map(([label, value]) => ({
+        label,
+        value,
+        percent: Math.round((value / total) * 100),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [appointments, recurrencePeriod]);
+
+  // (Mantenha o restante das funções e useMemos que já existiam no DisplayModeView...)
 
   // Filtra apenas os agendamentos do dia anterior útil, dia atual e próximo dia útil
   const filteredAppointments = useMemo(() => {
@@ -574,32 +617,53 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
           </section>
 
           <section className="workspace dashboard-chart-grid">
-            <div className="dashboard-chart-column">
-              <div className="list-panel">
-                <div className="section-title">
-                  <h2>Atendimentos por cliente no mes</h2>
-                  <PieChart size={18} />
-                </div>
-                <DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
-              </div>
-            </div>
-            <div className="dashboard-chart-column">
-              <div className="list-panel">
-                <div className="section-title">
-                  <h2>Visitas por tipo</h2>
-                  <PieChart size={18} />
-                </div>
-                <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
-              </div>
-              <div className="list-panel">
-                <div className="section-title">
-                  <h2>Atividade operacional</h2>
-                  <BarChart3 size={18} />
-                </div>
-                <MiniBarChart rows={dashboard?.charts?.monthlyActivity || []} keys={['correctives', 'appointments']} />
-              </div>
-            </div>
-          </section>
+						<div className="dashboard-chart-column">
+							<div className="list-panel">
+								<div className="section-title">
+									<h2>Atendimentos por cliente no mes</h2>
+									<PieChart size={18} />
+								</div>
+								<DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
+							</div>
+						</div>
+						<div className="dashboard-chart-column">
+							<div className="list-panel">
+								<div className="section-title">
+									<h2>Visitas por tipo</h2>
+									<PieChart size={18} />
+								</div>
+								<DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
+							</div>
+							<div className="list-panel">
+								<div className="section-title">
+									<div>
+										<h2>Recorrência de Atendimentos</h2>
+										<small style={{ color: 'var(--muted)', fontSize: '12px', display: 'block', marginTop: '2px' }}>
+											Agendamentos ({recurrencePeriod === '1m' ? 'Último Mês' : 'Últimos 6 Meses'})
+										</small>
+									</div>
+
+									<div className="segmented">
+										<button
+											className={recurrencePeriod === '1m' ? 'active' : ''}
+											type="button"
+											onClick={() => setRecurrencePeriod('1m')}
+										>
+											1m
+										</button>
+										<button
+											className={recurrencePeriod === '6m' ? 'active' : ''}
+											type="button"
+											onClick={() => setRecurrencePeriod('6m')}
+										>
+											6m
+										</button>
+									</div>
+								</div>
+								<DonutChart rows={recurrenceChartData} />
+							</div>
+						</div>
+					</section>
 
           <section className="list-panel">
             <div className="section-title">
