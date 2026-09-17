@@ -583,7 +583,9 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
                 <DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
               </div>
             </div>
+          
             <div className="dashboard-chart-column">
+              {/* Gráfico 1: Visitas por tipo */}
               <div className="list-panel">
                 <div className="section-title">
                   <h2>Visitas por tipo</h2>
@@ -591,6 +593,39 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
                 </div>
                 <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
               </div>
+          
+              {/* NOVO GRÁFICO: Recorrência de Atendimentos ao lado do Visitas por tipo */}
+              <div className="list-panel">
+                <div className="section-title">
+                  <div>
+                    <h2>Recorrência de Atendimentos</h2>
+                    <small style={{ color: 'var(--muted)', fontSize: '12px' }}>
+                      Agendamentos ({recurrencePeriod === '1m' ? 'Último Mês' : 'Últimos 6 Meses'})
+                    </small>
+                  </div>
+                  
+                  {/* Seletor de período */}
+                  <div className="segmented">
+                    <button
+                      className={recurrencePeriod === '1m' ? 'active' : ''}
+                      type="button"
+                      onClick={() => setRecurrencePeriod('1m')}
+                    >
+                      1 mês
+                    </button>
+                    <button
+                      className={recurrencePeriod === '6m' ? 'active' : ''}
+                      type="button"
+                      onClick={() => setRecurrencePeriod('6m')}
+                    >
+                      6 meses
+                    </button>
+                  </div>
+                </div>
+                <DonutChart rows={recurrenceChartData} />
+              </div>
+          
+              {/* Gráfico 3: Atividade operacional */}
               <div className="list-panel">
                 <div className="section-title">
                   <h2>Atividade operacional</h2>
