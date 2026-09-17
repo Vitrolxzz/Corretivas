@@ -623,7 +623,7 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
       {activeView === 'appointments' && (
         <section className="display-mode-content list-panel display-table-panel">
           <div className="section-title">
-            <h2>Visitas técnicas dos dias úteis (Anterior, Hoje e Próximo)</h2>
+            <h2>Visitas técnicas agendadas</h2>
             <span className="counter">{filteredAppointments.length} registros</span>
           </div>
           <div className="table-wrap">
