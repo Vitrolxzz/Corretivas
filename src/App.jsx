@@ -1468,13 +1468,13 @@ export default function App() {
       const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
       if (window.scrollY >= maximumScroll - 2) {
-        nextTabTimer = window.setTimeout(() => {
-          if (!cancelled) {
-            setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
-          }
-        }, displayTabs[displayModeTabIndex] === 'turnstiles' ? 4000 : 3000);
-        return;
-      }
+		  nextTabTimer = window.setTimeout(() => {
+			  if (!cancelled) {
+				  setDisplayModeTabIndex((current) => (current + 1) % displayTbs.length);
+			  }
+		  }, displayTabs[displayModeTabIndex] === 'dashboard' ? 20000 : 5000);
+		  return;
+	  }
 
       if (lastFrameTime !== null) {
         const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
