@@ -542,7 +542,7 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 	useEffect(() => {
 		const interval = setInterval(() => {
 			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
-		}, 10300);
+		}, 10000);
 
 		return () => clearInterval(interval);
 	}, []);
@@ -1013,6 +1013,7 @@ export default function App() {
   const [clientHistory, setClientHistory] = useState(null);
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
   const [displayCycleCount, setDisplayCycleCount] = useState(0);
+	
   const getActiveScreenId = () => {
   if (displayMode) {
     const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
