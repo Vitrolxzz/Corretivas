@@ -541,7 +541,7 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 	// Alterna automaticamente a cada 5 segundos no Modo de Exibição
 	useEffect(() => {
 		const interval = setInterval(() => {
-			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' );
+			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
 		}, 7500 );
 
 		return () => clearInterval(interval);
