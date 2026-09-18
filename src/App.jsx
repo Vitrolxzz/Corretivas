@@ -1474,7 +1474,7 @@ export default function App() {
 				if (!tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
-					const delay = currentTab === 'dashboard' ? 15000 : 5000;
+					const delay = currentTab === 'dashboard' ? 20000 : 10000;
 
 					nextTabTimer = window.setTimeout(() => {
 						if (!cancelled) {
