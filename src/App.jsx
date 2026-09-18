@@ -1012,6 +1012,7 @@ export default function App() {
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [clientHistory, setClientHistory] = useState(null);
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
+  const [displayCycleCount, setDisplayCycleCount] = useState(0);
 
 	useEffect(() => {
 		const interval = setInterval(() => {
@@ -1457,7 +1458,7 @@ export default function App() {
 		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
 		setActiveTab(displayTabs[displayModeTabIndex]);
 
-		// Zera a posição da página imediatamente ao trocar de aba
+		// Zera a posição da página ao trocar de aba
 		window.scrollTo(0, 0);
 
 		let frameId;
@@ -1475,16 +1476,22 @@ export default function App() {
 
 			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-			// Se a página não tiver barra de rolagem (conteúdo curto)
-			if (maximumScroll <= 10) {
+			if (maximumScroll <= 10 || window.scrollY >= maximumScroll - 5) {
 				if (!tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
-					const delay = currentTab === 'dashboard' ? 14000 : 5000;
+					const delay = currentTab === 'dashboard' ? 20000 : 5000;
 
 					nextTabTimer = window.setTimeout(() => {
 						if (!cancelled) {
-							setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+							setDisplayModeTabIndex((current) => {
+								const nextIndex = (current + 1) % displayTabs.length;
+								// Se o próximo índice for 0 (Dashboard), incrementa o ciclo para forçar o reset do gráfico
+								if (nextIndex === 0) {
+									setDisplayCycleCount((c) => c + 1);
+								}
+								return nextIndex;
+							});
 						}
 					}, delay);
 				}
@@ -1492,24 +1499,6 @@ export default function App() {
 				return;
 			}
 
-			// Se chegou ao final da página
-			if (window.scrollY >= maximumScroll - 5) {
-				if (!tabSwitched) {
-					tabSwitched = true;
-					const currentTab = displayTabs[displayModeTabIndex];
-					const delay = currentTab === 'dashboard' ? 14000 : 5000;
-
-					nextTabTimer = window.setTimeout(() => {
-						if (!cancelled) {
-							setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
-						}
-					}, delay);
-				}
-				frameId = window.requestAnimationFrame(scrollSlowly);
-				return;
-			}
-
-			// Rolagem suave e contínua
 			if (lastFrameTime !== null) {
 				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
 				scrollAccumulator += 40 * elapsedSeconds;
@@ -1527,7 +1516,6 @@ export default function App() {
 			frameId = window.requestAnimationFrame(scrollSlowly);
 		};
 
-		// Aguarda 600ms para o React renderizar completamente a nova aba antes de iniciar a medição da tela
 		startTimer = window.setTimeout(() => {
 			window.scrollTo(0, 0);
 			scrollAccumulator = 0;
