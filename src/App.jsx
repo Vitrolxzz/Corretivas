@@ -1016,7 +1016,7 @@ export default function App() {
 	useEffect(() => {
 		const interval = setInterval(() => {
 			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
-		}, 5000);
+		}, 7500);
 
 		return () => clearInterval(interval);
 	}, []);
