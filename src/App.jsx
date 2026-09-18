@@ -1457,7 +1457,7 @@ export default function App() {
 		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
 		setActiveTab(displayTabs[displayModeTabIndex]);
 
-		// Zera a rolagem para o topo SOMENTE ao mudar a aba (Dashboard, Agendamentos, Catracas)
+		// Reseta a rolagem para o topo ao trocar de aba
 		window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
 		let frameId;
@@ -1473,11 +1473,10 @@ export default function App() {
 				return;
 			}
 
-			// Posição máxima recalculada a cada quadro para se adaptar às trocas do gráfico
 			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-			// Se a página for mais curta que a tela (sem scroll)
-			if (maximumScroll <= 5) {
+			// Se a página for realmente menor que a tela (sem barra de rolagem)
+			if (maximumScroll <= 10) {
 				if (!tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
@@ -1489,11 +1488,19 @@ export default function App() {
 						}
 					}, delay);
 				}
+				// Continua rodando o loop para o caso da página carregar dados e criar scroll depois
+				frameId = window.requestAnimationFrame(scrollSlowly);
 				return;
 			}
 
+			// Se tiver scroll, cancela o "tabSwitched" caso a página tenha crescido após o carregamento inicial
+			if (tabSwitched && window.scrollY < maximumScroll - 10) {
+				tabSwitched = false;
+				window.clearTimeout(nextTabTimer);
+			}
+
 			// Se chegou ao final da página
-			if (window.scrollY >= maximumScroll - 3) {
+			if (window.scrollY >= maximumScroll - 5) {
 				if (!tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
@@ -1505,7 +1512,13 @@ export default function App() {
 						}
 					}, delay);
 				}
+				frameId = window.requestAnimationFrame(scrollSlowly);
 				return;
+			}
+
+			// Sincroniza o acumulador com a rolagem atual se houver divergência
+			if (Math.abs(scrollAccumulator - window.scrollY) > 10) {
+				scrollAccumulator = window.scrollY;
 			}
 
 			// Rolagem fluida contínua
@@ -1526,10 +1539,11 @@ export default function App() {
 			frameId = window.requestAnimationFrame(scrollSlowly);
 		};
 
+		// Pequeno atraso (500ms) para dar tempo de os elementos e gráficos renderizarem na DOM
 		startTimer = window.setTimeout(() => {
-			scrollAccumulator = 0;
+			scrollAccumulator = window.scrollY;
 			frameId = window.requestAnimationFrame(scrollSlowly);
-		}, 300);
+		}, 500);
 
 		return () => {
 			cancelled = true;
