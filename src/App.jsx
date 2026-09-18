@@ -1014,13 +1014,7 @@ export default function App() {
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
   const [displayCycleCount, setDisplayCycleCount] = useState(0);
 
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
-		}, 7500);
-
-		return () => clearInterval(interval);
-	}, []);
+	//codigo aqui
 
   const recurrenceChartData = useMemo(() => {
     const now = new Date();
