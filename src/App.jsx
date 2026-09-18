@@ -1463,6 +1463,7 @@ export default function App() {
     let nextTabTimer;
     let cancelled = false;
     let lastFrameTime = null;
+    let tabSwitched = false; // Impede a criação repetida de timers no rodapé
 
     const scrollSlowly = (frameTime) => {
       if (cancelled) {
@@ -1471,18 +1472,22 @@ export default function App() {
 
       const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-      if (windows.scrollY >= maximumScroll - 2) {
-		  const currentTab = displayTabs[displayModeTabIndex];
-		  //20s para a dashboard e 5s para as outras
-		  const delay = currentTab === 'dashboard' ? 20000 : 5000;
+      // Checou no rodapé ou a tela não tem barra de rolagem
+      if (window.scrollY >= maximumScroll - 2) {
+        if (!tabSwitched) {
+          tabSwitched = true;
+          const currentTab = displayTabs[displayModeTabIndex];
+			//20s para dashboard e 5 para as outras
+          const delay = currentTab === 'dashboard' ? 20000 : 5000;
 
-		  nextTabTimer = windows.setTimeout(() => {
-			  if (!cancelled) {
-				  setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
-			  }
-		  }, delay);
-		  return;
-	  }
+          nextTabTimer = window.setTimeout(() => {
+            if (!cancelled) {
+              setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+            }
+          }, delay);
+        }
+        return;
+      }
 
       if (lastFrameTime !== null) {
         const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
@@ -1503,7 +1508,7 @@ export default function App() {
       window.clearTimeout(nextTabTimer);
       window.cancelAnimationFrame(frameId);
     };
-  }, [displayMode, displayModeTabIndex]);
+  }, [displayMode, displayModeTabIndex, recurrencePeriod]);
 
   useEffect(() => {
     if (!displayMode) {
