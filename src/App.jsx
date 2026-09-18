@@ -542,7 +542,7 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 	useEffect(() => {
 		const interval = setInterval(() => {
 			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
-		}, 7500);
+		}, 10000);
 
 		return () => clearInterval(interval);
 	}, []);
@@ -1474,7 +1474,7 @@ export default function App() {
 				if (!tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
-					const delay = currentTab === 'dashboard' ? 14000 : 5000;
+					const delay = currentTab === 'dashboard' ? 15000 : 5000;
 
 					nextTabTimer = window.setTimeout(() => {
 						if (!cancelled) {
