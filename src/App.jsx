@@ -1471,14 +1471,18 @@ export default function App() {
 
       const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-      if (window.scrollY >= maximumScroll - 2) {
-        nextTabTimer = window.setTimeout(() => {
-          if (!cancelled) {
-            setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
-          }
-        }, displayTabs[displayModeTabIndex] === 'turnstiles' ? 4000 : 3000);
-        return;
-      }
+      if (windows.scrollY >= maximumScroll - 2) {
+		  const currentTab = displayTabs[displayModeTabIndex];
+		  //20s para a dashboard e 5s para as outras
+		  const delay = currentTab === 'dashboard' ? 20000 : 5000;
+
+		  nextTabTimer = windows.setTimeout(() => {
+			  if (!cancelled) {
+				  setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+			  }
+		  }, delay);
+		  return;
+	  }
 
       if (lastFrameTime !== null) {
         const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
