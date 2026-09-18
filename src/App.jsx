@@ -1463,16 +1463,15 @@ export default function App() {
 		let cancelled = false;
 		let lastFrameTime = null;
 		let tabSwitched = false;
+		let scrollAccumulator = window.scrollY; // Mantém a precisão sub-pixel
 
 		const scrollSlowly = (frameTime) => {
 			if (cancelled) {
 				return;
 			}
 
-			// Recalcula dinamicamente a cada frame para pegar alterações de layout (como a troca para 6 meses)
 			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-			// Se a página não tem rolagem suficiente (ex: dashboard curto)
 			if (maximumScroll <= 5) {
 				if (!tabSwitched) {
 					tabSwitched = true;
@@ -1488,7 +1487,6 @@ export default function App() {
 				return;
 			}
 
-			// Se chegou ao final da página
 			if (window.scrollY >= maximumScroll - 2) {
 				if (!tabSwitched) {
 					tabSwitched = true;
@@ -1504,10 +1502,13 @@ export default function App() {
 				return;
 			}
 
-			// Incremento contínuo do scroll baseado no tempo decorrido
 			if (lastFrameTime !== null) {
 				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
-				window.scrollBy({ top: 55 * elapsedSeconds, left: 0, behavior: 'auto' });
+				// Velocidade suave de ~40 pixels por segundo
+				scrollAccumulator += 40 * elapsedSeconds;
+				window.scrollTo({ top: scrollAccumulator, left: 0, behavior: 'auto' });
+			} else {
+				scrollAccumulator = window.scrollY;
 			}
 
 			lastFrameTime = frameTime;
@@ -1515,6 +1516,7 @@ export default function App() {
 		};
 
 		startTimer = window.setTimeout(() => {
+			scrollAccumulator = window.scrollY;
 			frameId = window.requestAnimationFrame(scrollSlowly);
 		}, 300);
 
