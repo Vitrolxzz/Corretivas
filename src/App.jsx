@@ -1457,13 +1457,16 @@ export default function App() {
 		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
 		setActiveTab(displayTabs[displayModeTabIndex]);
 
+		// Força o scroll para o topo sempre que muda a aba do modo de exibição
+		window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+
 		let frameId;
 		let startTimer;
 		let nextTabTimer;
 		let cancelled = false;
 		let lastFrameTime = null;
 		let tabSwitched = false;
-		let scrollAccumulator = window.scrollY; // Mantém a precisão sub-pixel
+		let scrollAccumulator = 0; // Inicia do topo
 
 		const scrollSlowly = (frameTime) => {
 			if (cancelled) {
@@ -1504,7 +1507,6 @@ export default function App() {
 
 			if (lastFrameTime !== null) {
 				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
-				// Velocidade suave de ~40 pixels por segundo
 				scrollAccumulator += 40 * elapsedSeconds;
 				window.scrollTo({ top: scrollAccumulator, left: 0, behavior: 'auto' });
 			} else {
@@ -1516,7 +1518,7 @@ export default function App() {
 		};
 
 		startTimer = window.setTimeout(() => {
-			scrollAccumulator = window.scrollY;
+			scrollAccumulator = 0;
 			frameId = window.requestAnimationFrame(scrollSlowly);
 		}, 300);
 
