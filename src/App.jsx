@@ -1457,7 +1457,7 @@ export default function App() {
 		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
 		setActiveTab(displayTabs[displayModeTabIndex]);
 
-		// Garante que a página comece sempre do topo ao alternar de aba
+		// Zera a rolagem para o topo SOMENTE ao mudar a aba (Dashboard, Agendamentos, Catracas)
 		window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
 		let frameId;
@@ -1467,17 +1467,16 @@ export default function App() {
 		let lastFrameTime = null;
 		let tabSwitched = false;
 		let scrollAccumulator = 0;
-		let reachedBottomTime = null;
 
 		const scrollSlowly = (frameTime) => {
 			if (cancelled) {
 				return;
 			}
 
-			// Posição máxima atual do scroll
+			// Posição máxima recalculada a cada quadro para se adaptar às trocas do gráfico
 			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-			// Se a página não possui rolagem
+			// Se a página for mais curta que a tela (sem scroll)
 			if (maximumScroll <= 5) {
 				if (!tabSwitched) {
 					tabSwitched = true;
@@ -1493,19 +1492,9 @@ export default function App() {
 				return;
 			}
 
-			// Se a posição atual for maior que o acumulador (ex: mudou layout ou usuário rolou), sincroniza
-			if (Math.abs(window.scrollY - scrollAccumulator) > 5) {
-				scrollAccumulator = window.scrollY;
-			}
-
-			// Verifica se realmente atingiu o final da página
+			// Se chegou ao final da página
 			if (window.scrollY >= maximumScroll - 3) {
-				if (reachedBottomTime === null) {
-					reachedBottomTime = frameTime;
-				}
-
-				// Aguarda 300ms contínuos no fim da página para confirmar que não é uma re-renderização do gráfico
-				if (frameTime - reachedBottomTime > 300 && !tabSwitched) {
+				if (!tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
 					const delay = currentTab === 'dashboard' ? 20000 : 5000;
@@ -1516,21 +1505,21 @@ export default function App() {
 						}
 					}, delay);
 				}
-			} else {
-				// Se ainda não chegou ao fim, limpa a confirmação de fim de página
-				reachedBottomTime = null;
+				return;
+			}
 
-				if (lastFrameTime !== null) {
-					const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
-					scrollAccumulator += 40 * elapsedSeconds;
+			// Rolagem fluida contínua
+			if (lastFrameTime !== null) {
+				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
+				scrollAccumulator += 40 * elapsedSeconds;
 
-					// Se o acumulador ultrapassar o máximo, trava no limite
-					if (scrollAccumulator > maximumScroll) {
-						scrollAccumulator = maximumScroll;
-					}
-
-					window.scrollTo({ top: scrollAccumulator, left: 0, behavior: 'auto' });
+				if (scrollAccumulator > maximumScroll) {
+					scrollAccumulator = maximumScroll;
 				}
+
+				window.scrollTo({ top: scrollAccumulator, left: 0, behavior: 'auto' });
+			} else {
+				scrollAccumulator = window.scrollY;
 			}
 
 			lastFrameTime = frameTime;
@@ -1548,7 +1537,8 @@ export default function App() {
 			window.clearTimeout(nextTabTimer);
 			window.cancelAnimationFrame(frameId);
 		};
-	}, [displayMode, displayModeTabIndex, recurrencePeriod]);
+	}, [displayMode, displayModeTabIndex]);
+	
   useEffect(() => {
     if (!displayMode) {
       return undefined;
