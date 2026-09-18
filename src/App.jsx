@@ -1457,8 +1457,8 @@ export default function App() {
 		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
 		setActiveTab(displayTabs[displayModeTabIndex]);
 
-		// Reseta a rolagem para o topo ao trocar de aba
-		window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+		// Zera a posição da página imediatamente ao trocar de aba
+		window.scrollTo(0, 0);
 
 		let frameId;
 		let startTimer;
@@ -1475,7 +1475,7 @@ export default function App() {
 
 			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-			// Se a página for realmente menor que a tela (sem barra de rolagem)
+			// Se a página não tiver barra de rolagem (conteúdo curto)
 			if (maximumScroll <= 10) {
 				if (!tabSwitched) {
 					tabSwitched = true;
@@ -1488,15 +1488,8 @@ export default function App() {
 						}
 					}, delay);
 				}
-				// Continua rodando o loop para o caso da página carregar dados e criar scroll depois
 				frameId = window.requestAnimationFrame(scrollSlowly);
 				return;
-			}
-
-			// Se tiver scroll, cancela o "tabSwitched" caso a página tenha crescido após o carregamento inicial
-			if (tabSwitched && window.scrollY < maximumScroll - 10) {
-				tabSwitched = false;
-				window.clearTimeout(nextTabTimer);
 			}
 
 			// Se chegou ao final da página
@@ -1516,12 +1509,7 @@ export default function App() {
 				return;
 			}
 
-			// Sincroniza o acumulador com a rolagem atual se houver divergência
-			if (Math.abs(scrollAccumulator - window.scrollY) > 10) {
-				scrollAccumulator = window.scrollY;
-			}
-
-			// Rolagem fluida contínua
+			// Rolagem suave e contínua
 			if (lastFrameTime !== null) {
 				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
 				scrollAccumulator += 40 * elapsedSeconds;
@@ -1530,7 +1518,7 @@ export default function App() {
 					scrollAccumulator = maximumScroll;
 				}
 
-				window.scrollTo({ top: scrollAccumulator, left: 0, behavior: 'auto' });
+				window.scrollTo(0, scrollAccumulator);
 			} else {
 				scrollAccumulator = window.scrollY;
 			}
@@ -1539,11 +1527,12 @@ export default function App() {
 			frameId = window.requestAnimationFrame(scrollSlowly);
 		};
 
-		// Pequeno atraso (500ms) para dar tempo de os elementos e gráficos renderizarem na DOM
+		// Aguarda 600ms para o React renderizar completamente a nova aba antes de iniciar a medição da tela
 		startTimer = window.setTimeout(() => {
-			scrollAccumulator = window.scrollY;
+			window.scrollTo(0, 0);
+			scrollAccumulator = 0;
 			frameId = window.requestAnimationFrame(scrollSlowly);
-		}, 500);
+		}, 600);
 
 		return () => {
 			cancelled = true;
