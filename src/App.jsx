@@ -538,19 +538,14 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 	// 1. Estado interno para controlar a seleção de 1 mês ou 6 meses
 	const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
 
-	// Reseta o gráfico para '1m' sempre que a aba ativa mudar para 'dashboard'
+	// Alterna automaticamente a cada 5 segundos no Modo de Exibição
 	useEffect(() => {
-		if (activeTab === 'dashboard') {
-			setRecurrencePeriod('1m');
+		const interval = setInterval(() => {
+			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
+		}, 7500);
 
-			// Executa a alternância para '6m' uma única vez após 8 segundos
-			const timer = window.setTimeout(() => {
-				setRecurrencePeriod('6m');
-			}, 8000);
-
-			return () => window.clearTimeout(timer);
-		}
-	}, [activeTab]);
+		return () => clearInterval(interval);
+	}, []);
 
 	const viewTitle = {
 		dashboard: 'Dashboard',
@@ -1462,7 +1457,7 @@ export default function App() {
 		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
 		setActiveTab(displayTabs[displayModeTabIndex]);
 
-		// Zera a posição da página ao trocar de aba
+		// Zera a posição da página imediatamente ao trocar de aba
 		window.scrollTo(0, 0);
 
 		let frameId;
@@ -1480,12 +1475,12 @@ export default function App() {
 
 			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-			// Se a página for curta (sem barra de rolagem)
+			// Se a página não tiver barra de rolagem (conteúdo curto)
 			if (maximumScroll <= 10) {
 				if (!tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
-					const delay = currentTab === 'dashboard' ? 20000 : 5000;
+					const delay = currentTab === 'dashboard' ? 14000 : 5000;
 
 					nextTabTimer = window.setTimeout(() => {
 						if (!cancelled) {
@@ -1502,7 +1497,7 @@ export default function App() {
 				if (!tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
-					const delay = currentTab === 'dashboard' ? 20000 : 5000;
+					const delay = currentTab === 'dashboard' ? 14000 : 5000;
 
 					nextTabTimer = window.setTimeout(() => {
 						if (!cancelled) {
@@ -1532,6 +1527,7 @@ export default function App() {
 			frameId = window.requestAnimationFrame(scrollSlowly);
 		};
 
+		// Aguarda 600ms para o React renderizar completamente a nova aba antes de iniciar a medição da tela
 		startTimer = window.setTimeout(() => {
 			window.scrollTo(0, 0);
 			scrollAccumulator = 0;
