@@ -542,7 +542,7 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 	useEffect(() => {
 		const interval = setInterval(() => {
 			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
-		}, 10800);
+		}, 10700);
 
 		return () => clearInterval(interval);
 	}, []);
