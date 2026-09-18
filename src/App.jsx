@@ -1541,6 +1541,19 @@ export default function App() {
 			window.cancelAnimationFrame(frameId);
 		};
 	}, [displayMode, displayModeTabIndex]);
+
+  // Reseta o gráfico para '1m' sempre que a aba ativa ou o modo de exibição mudar para a Dashboard
+	useEffect(() => {
+		if (activeTab === 'dashboard') {
+			setRecurrencePeriod('1m');
+
+			const timer = window.setTimeout(() => {
+				setRecurrencePeriod('6m');
+			}, 8000);
+
+			return () => window.clearTimeout(timer);
+		}
+	}, [activeTab, displayModeTabIndex]);
 	
   useEffect(() => {
     if (!displayMode) {
@@ -2262,6 +2275,7 @@ export default function App() {
         turnstiles={displayModeRecords.turnstiles}
         selectedPeriod={selectedPeriod}
         onExit={exitDisplayMode}
+        recurrencePeriod={recurrencePeriod}
       />
     );
   }
