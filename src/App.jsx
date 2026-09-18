@@ -1013,8 +1013,13 @@ export default function App() {
   const [clientHistory, setClientHistory] = useState(null);
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
   const [displayCycleCount, setDisplayCycleCount] = useState(0);
-
-	//codigo aqui
+  const getActiveScreenId = () => {
+  if (displayMode) {
+    const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
+    return displayTabs[displayModeTabIndex];
+  }
+  return activeTab;
+  };
 
   const recurrenceChartData = useMemo(() => {
     const now = new Date();
