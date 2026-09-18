@@ -1450,68 +1450,81 @@ export default function App() {
   }, [dailyStartDate, dailyEndDate]);
 
   useEffect(() => {
-  if (!displayMode) {
-    return undefined;
-  }
+		if (!displayMode) {
+			return undefined;
+		}
 
-  const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
-  setActiveTab(displayTabs[displayModeTabIndex]);
+		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
+		setActiveTab(displayTabs[displayModeTabIndex]);
 
-  let frameId;
-  let startTimer;
-  let nextTabTimer;
-  let cancelled = false;
-  let lastFrameTime = null;
-  let tabSwitched = false;
+		let frameId;
+		let startTimer;
+		let nextTabTimer;
+		let cancelled = false;
+		let lastFrameTime = null;
+		let tabSwitched = false;
 
-  // 1. Volta suave para o topo se a tela não estiver no topo
-  if (window.scrollY > 0) {
-    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-  }
+		const scrollSlowly = (frameTime) => {
+			if (cancelled) {
+				return;
+			}
 
-  const scrollSlowly = (frameTime) => {
-    if (cancelled) {
-      return;
-    }
+			// Recalcula dinamicamente a cada frame para pegar alterações de layout (como a troca para 6 meses)
+			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-    const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+			// Se a página não tem rolagem suficiente (ex: dashboard curto)
+			if (maximumScroll <= 5) {
+				if (!tabSwitched) {
+					tabSwitched = true;
+					const currentTab = displayTabs[displayModeTabIndex];
+					const delay = currentTab === 'dashboard' ? 20000 : 5000;
 
-    if (window.scrollY >= maximumScroll - 2) {
-      if (!tabSwitched) {
-        tabSwitched = true;
-        const currentTab = displayTabs[displayModeTabIndex];
-        const delay = currentTab === 'dashboard' ? 20000 : 5000;
+					nextTabTimer = window.setTimeout(() => {
+						if (!cancelled) {
+							setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+						}
+					}, delay);
+				}
+				return;
+			}
 
-        nextTabTimer = window.setTimeout(() => {
-          if (!cancelled) {
-            setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
-          }
-        }, delay);
-      }
-      return;
-    }
+			// Se chegou ao final da página
+			if (window.scrollY >= maximumScroll - 2) {
+				if (!tabSwitched) {
+					tabSwitched = true;
+					const currentTab = displayTabs[displayModeTabIndex];
+					const delay = currentTab === 'dashboard' ? 20000 : 5000;
 
-    if (lastFrameTime !== null) {
-      const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
-      window.scrollBy({ top: 55 * elapsedSeconds, left: 0, behavior: 'auto' });
-    }
+					nextTabTimer = window.setTimeout(() => {
+						if (!cancelled) {
+							setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+						}
+					}, delay);
+				}
+				return;
+			}
 
-    lastFrameTime = frameTime;
-    frameId = window.requestAnimationFrame(scrollSlowly);
-  };
+			// Incremento contínuo do scroll baseado no tempo decorrido
+			if (lastFrameTime !== null) {
+				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
+				window.scrollBy({ top: 55 * elapsedSeconds, left: 0, behavior: 'auto' });
+			}
 
-  // 2. Inicia o scroll imediatamente (ou reduz o delay na troca de período)
-  startTimer = window.setTimeout(() => {
-    frameId = window.requestAnimationFrame(scrollSlowly);
-  }, 100);
+			lastFrameTime = frameTime;
+			frameId = window.requestAnimationFrame(scrollSlowly);
+		};
 
-  return () => {
-    cancelled = true;
-    window.clearTimeout(startTimer);
-    window.clearTimeout(nextTabTimer);
-    window.cancelAnimationFrame(frameId);
-  };
-}, [displayMode, displayModeTabIndex]); // 3. Removido recurrencePeriod daqui
+		startTimer = window.setTimeout(() => {
+			frameId = window.requestAnimationFrame(scrollSlowly);
+		}, 300);
+
+		return () => {
+			cancelled = true;
+			window.clearTimeout(startTimer);
+			window.clearTimeout(nextTabTimer);
+			window.cancelAnimationFrame(frameId);
+		};
+	}, [displayMode, displayModeTabIndex]);
 
   useEffect(() => {
     if (!displayMode) {
