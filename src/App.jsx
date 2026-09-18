@@ -1457,7 +1457,7 @@ export default function App() {
 		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
 		setActiveTab(displayTabs[displayModeTabIndex]);
 
-		// Força o scroll para o topo sempre que muda a aba do modo de exibição
+		// Garante que a página comece sempre do topo ao alternar de aba
 		window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
 		let frameId;
@@ -1466,15 +1466,18 @@ export default function App() {
 		let cancelled = false;
 		let lastFrameTime = null;
 		let tabSwitched = false;
-		let scrollAccumulator = 0; // Inicia do topo
+		let scrollAccumulator = 0;
+		let reachedBottomTime = null;
 
 		const scrollSlowly = (frameTime) => {
 			if (cancelled) {
 				return;
 			}
 
+			// Posição máxima atual do scroll
 			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
+			// Se a página não possui rolagem
 			if (maximumScroll <= 5) {
 				if (!tabSwitched) {
 					tabSwitched = true;
@@ -1490,8 +1493,19 @@ export default function App() {
 				return;
 			}
 
-			if (window.scrollY >= maximumScroll - 2) {
-				if (!tabSwitched) {
+			// Se a posição atual for maior que o acumulador (ex: mudou layout ou usuário rolou), sincroniza
+			if (Math.abs(window.scrollY - scrollAccumulator) > 5) {
+				scrollAccumulator = window.scrollY;
+			}
+
+			// Verifica se realmente atingiu o final da página
+			if (window.scrollY >= maximumScroll - 3) {
+				if (reachedBottomTime === null) {
+					reachedBottomTime = frameTime;
+				}
+
+				// Aguarda 300ms contínuos no fim da página para confirmar que não é uma re-renderização do gráfico
+				if (frameTime - reachedBottomTime > 300 && !tabSwitched) {
 					tabSwitched = true;
 					const currentTab = displayTabs[displayModeTabIndex];
 					const delay = currentTab === 'dashboard' ? 20000 : 5000;
@@ -1502,15 +1516,21 @@ export default function App() {
 						}
 					}, delay);
 				}
-				return;
-			}
-
-			if (lastFrameTime !== null) {
-				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
-				scrollAccumulator += 40 * elapsedSeconds;
-				window.scrollTo({ top: scrollAccumulator, left: 0, behavior: 'auto' });
 			} else {
-				scrollAccumulator = window.scrollY;
+				// Se ainda não chegou ao fim, limpa a confirmação de fim de página
+				reachedBottomTime = null;
+
+				if (lastFrameTime !== null) {
+					const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
+					scrollAccumulator += 40 * elapsedSeconds;
+
+					// Se o acumulador ultrapassar o máximo, trava no limite
+					if (scrollAccumulator > maximumScroll) {
+						scrollAccumulator = maximumScroll;
+					}
+
+					window.scrollTo({ top: scrollAccumulator, left: 0, behavior: 'auto' });
+				}
 			}
 
 			lastFrameTime = frameTime;
@@ -1528,8 +1548,7 @@ export default function App() {
 			window.clearTimeout(nextTabTimer);
 			window.cancelAnimationFrame(frameId);
 		};
-	}, [displayMode, displayModeTabIndex]);
-
+	}, [displayMode, displayModeTabIndex, recurrencePeriod]);
   useEffect(() => {
     if (!displayMode) {
       return undefined;
