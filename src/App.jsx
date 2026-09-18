@@ -542,7 +542,7 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 	useEffect(() => {
 		const interval = setInterval(() => {
 			setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
-		}, 7500 );
+		}, 7500);
 
 		return () => clearInterval(interval);
 	}, []);
@@ -1450,57 +1450,109 @@ export default function App() {
   }, [dailyStartDate, dailyEndDate]);
 
   useEffect(() => {
-    if (!displayMode) {
-      return undefined;
-    }
+		if (!displayMode) {
+			return undefined;
+		}
 
-    const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
-    setActiveTab(displayTabs[displayModeTabIndex]);
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
+		setActiveTab(displayTabs[displayModeTabIndex]);
 
-    let frameId;
-    let startTimer;
-    let nextTabTimer;
-    let cancelled = false;
-    let lastFrameTime = null;
+		// Reseta a rolagem para o topo ao trocar de aba
+		window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
-    const scrollSlowly = (frameTime) => {
-      if (cancelled) {
-        return;
-      }
+		let frameId;
+		let startTimer;
+		let nextTabTimer;
+		let cancelled = false;
+		let lastFrameTime = null;
+		let tabSwitched = false;
+		let scrollAccumulator = 0;
 
-      const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+		const scrollSlowly = (frameTime) => {
+			if (cancelled) {
+				return;
+			}
 
-      if (window.scrollY >= maximumScroll - 2) {
-        nextTabTimer = window.setTimeout(() => {
-          if (!cancelled) {
-            setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
-          }
-        }, displayTabs[displayModeTabIndex] === 'turnstiles' ? 4000 : 3000);
-        return;
-      }
+			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-      if (lastFrameTime !== null) {
-        const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
-        window.scrollBy({ top: 55 * elapsedSeconds, left: 0, behavior: 'auto' });
-      }
+			// Se a página for realmente menor que a tela (sem barra de rolagem)
+			if (maximumScroll <= 10) {
+				if (!tabSwitched) {
+					tabSwitched = true;
+					const currentTab = displayTabs[displayModeTabIndex];
+					const delay = currentTab === 'dashboard' ? 20000 : 5000;
 
-      lastFrameTime = frameTime;
-      frameId = window.requestAnimationFrame(scrollSlowly);
-    };
+					nextTabTimer = window.setTimeout(() => {
+						if (!cancelled) {
+							setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+						}
+					}, delay);
+				}
+				// Continua rodando o loop para o caso da página carregar dados e criar scroll depois
+				frameId = window.requestAnimationFrame(scrollSlowly);
+				return;
+			}
 
-    startTimer = window.setTimeout(() => {
-      frameId = window.requestAnimationFrame(scrollSlowly);
-    }, 850);
+			// Se tiver scroll, cancela o "tabSwitched" caso a página tenha crescido após o carregamento inicial
+			if (tabSwitched && window.scrollY < maximumScroll - 10) {
+				tabSwitched = false;
+				window.clearTimeout(nextTabTimer);
+			}
 
-    return () => {
-      cancelled = true;
-      window.clearTimeout(startTimer);
-      window.clearTimeout(nextTabTimer);
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [displayMode, displayModeTabIndex]);
+			// Se chegou ao final da página
+			if (window.scrollY >= maximumScroll - 5) {
+				if (!tabSwitched) {
+					tabSwitched = true;
+					const currentTab = displayTabs[displayModeTabIndex];
+					const delay = currentTab === 'dashboard' ? 15000 : 5000;
 
+					nextTabTimer = window.setTimeout(() => {
+						if (!cancelled) {
+							setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+						}
+					}, delay);
+				}
+				frameId = window.requestAnimationFrame(scrollSlowly);
+				return;
+			}
+
+			// Sincroniza o acumulador com a rolagem atual se houver divergência
+			if (Math.abs(scrollAccumulator - window.scrollY) > 10) {
+				scrollAccumulator = window.scrollY;
+			}
+
+			// Rolagem fluida contínua
+			if (lastFrameTime !== null) {
+				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
+				scrollAccumulator += 40 * elapsedSeconds;
+
+				if (scrollAccumulator > maximumScroll) {
+					scrollAccumulator = maximumScroll;
+				}
+
+				window.scrollTo({ top: scrollAccumulator, left: 0, behavior: 'auto' });
+			} else {
+				scrollAccumulator = window.scrollY;
+			}
+
+			lastFrameTime = frameTime;
+			frameId = window.requestAnimationFrame(scrollSlowly);
+		};
+
+		// Pequeno atraso (500ms) para dar tempo de os elementos e gráficos renderizarem na DOM
+		startTimer = window.setTimeout(() => {
+			scrollAccumulator = window.scrollY;
+			frameId = window.requestAnimationFrame(scrollSlowly);
+		}, 500);
+
+		return () => {
+			cancelled = true;
+			window.clearTimeout(startTimer);
+			window.clearTimeout(nextTabTimer);
+			window.cancelAnimationFrame(frameId);
+		};
+	}, [displayMode, displayModeTabIndex]);
+	
   useEffect(() => {
     if (!displayMode) {
       return undefined;
