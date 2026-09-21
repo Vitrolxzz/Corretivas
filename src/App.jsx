@@ -58,8 +58,8 @@ const difficultyOptions = [
   { value: '5', label: '5 - muito dificil' },
 ];
 const appointmentStatuses = ['agendada', 'realizada', 'cancelada'];
-const appointmentVisitTypes = ['normal', 'garantia', 'retorno'];
-const noChargeAppointmentVisitTypes = new Set(['garantia', 'retorno']);
+const appointmentVisitTypes = ['normal', 'garantia', 'retorno', 'instalação'];
+const noChargeAppointmentVisitTypes = new Set(['garantia', 'retorno', 'instalação']);
 const turnstileStatuses = ['Aguardando montagem', 'Em andamento', 'Agendada', 'Finalizada', 'Entregue'];
 const systemNoteAuthors = ['Valquíria', 'Thiago', 'Lucas', 'Rubens', 'Vittor', 'Daniel A.', 'Daniel'];
 const pageSize = 50;
@@ -186,7 +186,7 @@ function formatMoney(value) {
 function getPreviousBusinessDay(date) {
   const d = new Date(date);
   d.setDate(d.getDate() - 1);
-  while (d.getDay() === 0 || d.getDay() === 6) { // 0 = Domingo, 6 = Sábado
+  while (d.getDay() === 0 || d.getDay() === 6) {
     d.setDate(d.getDate() - 1);
   }
   return d.toISOString().slice(0, 10);
@@ -195,7 +195,7 @@ function getPreviousBusinessDay(date) {
 function getNextBusinessDay(date) {
   const d = new Date(date);
   d.setDate(d.getDate() + 1);
-  while (d.getDay() === 0 || d.getDay() === 6) { // 0 = Domingo, 6 = Sábado
+  while (d.getDay() === 0 || d.getDay() === 6) {
     d.setDate(d.getDate() + 1);
   }
   return d.toISOString().slice(0, 10);
@@ -204,7 +204,6 @@ function getNextBusinessDay(date) {
 function getDisplayModeAppointments(appointments) {
   const todayObj = new Date();
   
-  // Se hoje for sábado ou domingo, ajusta para a sexta-feira anterior como referência
   while (todayObj.getDay() === 0 || todayObj.getDay() === 6) {
     todayObj.setDate(todayObj.getDate() - 1);
   }
@@ -535,246 +534,245 @@ function DonutChart({ rows = [] }) {
 }
 
 function DisplayModeView({ activeView, dashboard, appointments, turnstiles, selectedPeriod, onExit, recurrencePeriod, onToggleRecurrence }) {
-	const viewTitle = {
-		dashboard: 'Dashboard',
-		appointments: 'Agendamentos',
-		turnstiles: 'Catracas para montagem',
-	}[activeView];
+  const viewTitle = {
+    dashboard: 'Dashboard',
+    appointments: 'Agendamentos',
+    turnstiles: 'Catracas para montagem',
+  }[activeView];
 
-	// Cálculo do gráfico de Recorrência usando a lista de agendamentos do Modo de Exibição
-	const recurrenceChartData = useMemo(() => {
-		const now = new Date();
-		const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
+  const recurrenceChartData = useMemo(() => {
+    const now = new Date();
+    const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
 
-		const cutoffDate = new Date();
-		cutoffDate.setMonth(now.getMonth() - monthsCutoff);
+    const cutoffDate = new Date();
+    cutoffDate.setMonth(now.getMonth() - monthsCutoff);
 
-		const filtered = (appointments || []).filter((item) => {
-			const rawDate = item.visitDate || item.visit_date;
-			if (!rawDate) return false;
+    const filtered = (appointments || []).filter((item) => {
+      const rawDate = item.visitDate || item.visit_date;
+      if (!rawDate) return false;
 
-			const itemDate = new Date(rawDate);
-			return itemDate >= cutoffDate && itemDate <= now;
-		});
+      const itemDate = new Date(rawDate);
+      return itemDate >= cutoffDate && itemDate <= now;
+    });
 
-		const counts = {};
-		filtered.forEach((item) => {
-			const name = item.clientName || item.client_name || item.client || 'Não identificado';
-			counts[name] = (counts[name] || 0) + 1;
-		});
+    const counts = {};
+    filtered.forEach((item) => {
+      const name = item.clientName || item.client_name || item.client || 'Não identificado';
+      counts[name] = (counts[name] || 0) + 1;
+    });
 
-		const total = filtered.length;
-		if (!total) return [];
+    const total = filtered.length;
+    if (!total) return [];
 
-		return Object.entries(counts)
-			.map(([label, value]) => ({
-				label,
-				value,
-				percent: Math.round((value / total) * 100),
-			}))
-			.sort((a, b) => b.value - a.value)
-			.slice(0, 10);
-	}, [appointments, recurrencePeriod]);
+    return Object.entries(counts)
+      .map(([label, value]) => ({
+        label,
+        value,
+        percent: Math.round((value / total) * 100),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [appointments, recurrencePeriod]);
 
-	const filteredAppointments = useMemo(() => {
-		return getDisplayModeAppointments(appointments);
-	}, [appointments]);
+  const filteredAppointments = useMemo(() => {
+    return getDisplayModeAppointments(appointments);
+  }, [appointments]);
 
-	return (
-		<main className="display-mode-shell">
-			<header className="display-mode-header">
-				<div>
-					<div className="brand-row">
-						<Database size={25} />
-						<h1>Corretivas</h1>
-					</div>
-					<span>{viewTitle}</span>
-				</div>
-				<div className="display-mode-status">
-					<PeriodBadge period={selectedPeriod} />
-					<span>Modo de exibicao</span>
-					<button type="button" onClick={onExit} title="Sair do modo de exibicao (Esc)">
-						Esc para sair
-					</button>
-				</div>
-			</header>
+  return (
+    <main className="display-mode-shell">
+      <header className="display-mode-header">
+        <div>
+          <div className="brand-row">
+            <Database size={25} />
+            <h1>Corretivas</h1>
+          </div>
+          <span>{viewTitle}</span>
+        </div>
+        <div className="display-mode-status">
+          <PeriodBadge period={selectedPeriod} />
+          <span>Modo de exibicao</span>
+          <button type="button" onClick={onExit} title="Sair do modo de exibicao (Esc)">
+            Esc para sair
+          </button>
+        </div>
+      </header>
 
-			{activeView === 'dashboard' && (
-				<section className="display-mode-content workspace">
-					<section className="stats-grid expanded">
-						{dashboardMetricTiles.map((tile) => (
-							<StatTile key={tile.metric} icon={tile.icon} label={tile.label} value={dashboard?.stats?.[tile.stat]} />
-						))}
-					</section>
+      {activeView === 'dashboard' && (
+        <section className="display-mode-content workspace">
+          <section className="stats-grid expanded">
+            {dashboardMetricTiles.map((tile) => (
+              <StatTile key={tile.metric} icon={tile.icon} label={tile.label} value={dashboard?.stats?.[tile.stat]} />
+            ))}
+          </section>
 
-					<section className="workspace dashboard-chart-grid">
-						<div className="dashboard-chart-column">
-							<div className="list-panel">
-								<div className="section-title">
-									<h2>Atendimentos por cliente no mes</h2>
-									<PieChart size={18} />
-								</div>
-								<DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
-							</div>
-						</div>
-						<div className="dashboard-chart-column">
-							<div className="list-panel">
-								<div className="section-title">
-									<h2>Visitas por tipo</h2>
-									<PieChart size={18} />
-								</div>
-								<DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
-							</div>
-							<div className="list-panel">
-								<div className="section-title">
-									<div>
-										<h2>Recorrência de Atendimentos</h2>
-										<small style={{ color: 'var(--muted)', fontSize: '12px', display: 'block', marginTop: '2px' }}>
-											Agendamentos ({recurrencePeriod === '1m' ? 'Último Mês' : 'Últimos 6 Meses'})
-										</small>
-									</div>
+          <section className="workspace dashboard-chart-grid">
+            <div className="dashboard-chart-column">
+              <div className="list-panel">
+                <div className="section-title">
+                  <h2>Atendimentos por cliente no mes</h2>
+                  <PieChart size={18} />
+                </div>
+                <DonutChart rows={dashboard?.charts?.attendanceByClient || []} />
+              </div>
+            </div>
+            <div className="dashboard-chart-column">
+              <div className="list-panel">
+                <div className="section-title">
+                  <h2>Visitas por tipo</h2>
+                  <PieChart size={18} />
+                </div>
+                <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
+              </div>
+              <div className="list-panel">
+                <div className="section-title">
+                  <div>
+                    <h2>Recorrência de Atendimentos</h2>
+                    <small style={{ color: 'var(--muted)', fontSize: '12px', display: 'block', marginTop: '2px' }}>
+                      Agendamentos ({recurrencePeriod === '1m' ? 'Último Mês' : 'Últimos 6 Meses'})
+                    </small>
+                  </div>
 
-									<div className="segmented">
-										<button
-											className={recurrencePeriod === '1m' ? 'active' : ''}
-											type="button"
-											onClick={() => onToggleRecurrence && onToggleRecurrence('1m')}
-										>
-											1m
-										</button>
-										<button
-											className={recurrencePeriod === '6m' ? 'active' : ''}
-											type="button"
-											onClick={() => onToggleRecurrence && onToggleRecurrence('6m')}
-										>
-											6m
-										</button>
-									</div>
-								</div>
-								<DonutChart rows={recurrenceChartData} />
-							</div>
-						</div>
-					</section>
+                  <div className="segmented">
+                    <button
+                      className={recurrencePeriod === '1m' ? 'active' : ''}
+                      type="button"
+                      onClick={() => onToggleRecurrence && onToggleRecurrence('1m')}
+                    >
+                      1m
+                    </button>
+                    <button
+                      className={recurrencePeriod === '6m' ? 'active' : ''}
+                      type="button"
+                      onClick={() => onToggleRecurrence && onToggleRecurrence('6m')}
+                    >
+                      6m
+                    </button>
+                  </div>
+                </div>
+                <DonutChart rows={recurrenceChartData} />
+              </div>
+            </div>
+          </section>
 
-					<section className="list-panel">
-						<div className="section-title">
-							<h2>Proximas visitas agendadas</h2>
-						</div>
-						<div className="compact-list display-list">
-							{(dashboard?.lists?.upcomingAppointments || []).map((record) => (
-								<div key={record.id}>
-									<strong>{record.clientName}</strong>
-									<span>
-										{formatDate(record.visitDate)} - {record.technician || 'Sem tecnico'}
-									</span>
-								</div>
-							))}
-							{!(dashboard?.lists?.upcomingAppointments || []).length && <EmptyState label="Nenhuma visita futura." />}
-						</div>
-					</section>
-				</section>
-			)}
+          <section className="list-panel">
+            <div className="section-title">
+              <h2>Proximas visitas agendadas</h2>
+            </div>
+            <div className="compact-list display-list">
+              {(dashboard?.lists?.upcomingAppointments || []).map((record) => (
+                <div key={record.id}>
+                  <strong>{record.clientName}</strong>
+                  <span>
+                    {formatDate(record.visitDate)} - {record.technician || 'Sem tecnico'}
+                  </span>
+                </div>
+              ))}
+              {!(dashboard?.lists?.upcomingAppointments || []).length && <EmptyState label="Nenhuma visita futura." />}
+            </div>
+          </section>
+        </section>
+      )}
 
-			{activeView === 'appointments' && (
-				<section className="display-mode-content list-panel display-table-panel">
-					<div className="section-title">
-						<h2>Visitas técnicas agendadas</h2>
-						<span className="counter">{filteredAppointments.length} registros</span>
-					</div>
-					<div className="table-wrap">
-						<table>
-							<thead>
-								<tr>
-									<th>Data</th>
-									<th>Cliente</th>
-									<th>Endereco</th>
-									<th>Problema</th>
-									<th>Tecnico</th>
-									<th>Tipo visita</th>
-									<th>Status</th>
-								</tr>
-							</thead>
-							<tbody>
-								{filteredAppointments.map((record) => (
-									<tr key={record.id}>
-										<td>{formatDate(record.visitDate)}</td>
-										<td>{record.clientName}</td>
-										<td>{record.address || '-'}</td>
-										<td className="long-cell">
-											<div>{record.reportedProblem || '-'}</div>
-											{record.notes && <small className="cell-note">Obs: {record.notes}</small>}
-										</td>
-										<td>{record.technician || '-'}</td>
-										<td>{record.visitType || '-'}</td>
-										<td>
-											<StatusPill value={record.status} />
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-						{!filteredAppointments.length && (
-							<EmptyState label="Nenhum agendamento encontrado para o dia anterior útil, hoje ou próximo dia útil." />
-						)}
-					</div>
-				</section>
-			)}
+      {activeView === 'appointments' && (
+        <section className="display-mode-content list-panel display-table-panel">
+          <div className="section-title">
+            <h2>Visitas técnicas agendadas</h2>
+            <span className="counter">{filteredAppointments.length} registros</span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Cliente</th>
+                  <th>Endereco</th>
+                  <th>Problema</th>
+                  <th>Tecnico</th>
+                  <th>Tipo visita</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAppointments.map((record) => (
+                  <tr key={record.id}>
+                    <td>{formatDate(record.visitDate)}</td>
+                    <td>{record.clientName}</td>
+                    <td>{record.address || '-'}</td>
+                    <td className="long-cell">
+                      <div>{record.reportedProblem || '-'}</div>
+                      {record.notes && <small className="cell-note">Obs: {record.notes}</small>}
+                    </td>
+                    <td>{record.technician || '-'}</td>
+                    <td>{record.visitType || '-'}</td>
+                    <td>
+                      <StatusPill value={record.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!filteredAppointments.length && (
+              <EmptyState label="Nenhum agendamento encontrado para o dia anterior útil, hoje ou próximo dia útil." />
+            )}
+          </div>
+        </section>
+      )}
 
-			{activeView === 'turnstiles' && (
-				<section className="display-mode-content list-panel display-table-panel">
-					<div className="section-title">
-						<h2>Catracas para montagem cadastradas</h2>
-						<span className="counter">{turnstiles.length} registros</span>
-					</div>
-					<div className="table-wrap">
-						<table>
-							<thead>
-								<tr>
-									<th>Cliente</th>
-									<th>Modelo</th>
-									<th>Endereco</th>
-									<th>Entrega</th>
-									<th>Status</th>
-									<th>Urgencia</th>
-									<th>Prazo</th>
-								</tr>
-							</thead>
-							<tbody>
-								{turnstiles.map((record) => (
-									<tr key={record.id} className={`due-${record.dueStatus} urgency-${record.urgencyStatus || 'yellow'}`}>
-										<td>{record.clientName}</td>
-										<td>{record.model || '-'}</td>
-										<td>{record.clientAddress || '-'}</td>
-										<td>{formatDate(record.expectedDeliveryDate)}</td>
-										<td>
-											<StatusPill value={record.status} />
-										</td>
-										<td>
-											<TurnstileUrgencyPill record={record} />
-										</td>
-										<td>
-											<StatusPill
-												value={
-													record.dueStatus === 'overdue'
-														? 'Vencido'
-														: record.dueStatus === 'soon'
-															? 'Proximo'
-															: record.dueStatus === 'completed'
-																? 'Concluido'
-																: 'Normal'
-												}
-											/>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-						{!turnstiles.length && <EmptyState label="Nenhuma catraca cadastrada." />}
-					</div>
-				</section>
-			)}
-		</main>
-	);
+      {activeView === 'turnstiles' && (
+        <section className="display-mode-content list-panel display-table-panel">
+          <div className="section-title">
+            <h2>Catracas para montagem cadastradas</h2>
+            <span className="counter">{turnstiles.length} registros</span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Modelo</th>
+                  <th>Endereco</th>
+                  <th>Entrega</th>
+                  <th>Status</th>
+                  <th>Urgencia</th>
+                  <th>Prazo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {turnstiles.map((record) => (
+                  <tr key={record.id} className={`due-${record.dueStatus} urgency-${record.urgencyStatus || 'yellow'}`}>
+                    <td>{record.clientName}</td>
+                    <td>{record.model || '-'}</td>
+                    <td>{record.clientAddress || '-'}</td>
+                    <td>{formatDate(record.expectedDeliveryDate)}</td>
+                    <td>
+                      <StatusPill value={record.status} />
+                    </td>
+                    <td>
+                      <TurnstileUrgencyPill record={record} />
+                    </td>
+                    <td>
+                      <StatusPill
+                        value={
+                          record.dueStatus === 'overdue'
+                            ? 'Vencido'
+                            : record.dueStatus === 'soon'
+                              ? 'Proximo'
+                              : record.dueStatus === 'completed'
+                                ? 'Concluido'
+                                : 'Normal'
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!turnstiles.length && <EmptyState label="Nenhuma catraca cadastrada." />}
+          </div>
+        </section>
+      )}
+    </main>
+  );
 }
 
 function GlobalSearch({ onOpen, showToast }) {
@@ -997,7 +995,7 @@ export default function App() {
   const [clientHistory, setClientHistory] = useState(null);
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
 
-  // Alternância do temporizador de recorrência totalmente desacoplada da renderização
+  // Ao acessar a Dashboard, inicia sempre em 1m e muda para 6m após 10s (uma única vez)
   useEffect(() => {
     const isDashboard = displayMode 
       ? ['dashboard', 'appointments', 'turnstiles'][displayModeTabIndex] === 'dashboard'
@@ -1008,11 +1006,13 @@ export default function App() {
       return undefined;
     }
 
-    const interval = setInterval(() => {
-      setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
+    setRecurrencePeriod('1m');
+
+    const timer = setTimeout(() => {
+      setRecurrencePeriod('6m');
     }, 10000);
 
-    return () => clearInterval(interval);
+    return () => clearTimeout(timer);
   }, [displayMode, displayModeTabIndex, activeTab]);
 
   const recurrenceChartData = useMemo(() => {
@@ -1443,78 +1443,78 @@ export default function App() {
     setDailyReportPage(1);
   }, [dailyStartDate, dailyEndDate]);
 
-  // Controle do Scroll e Troca de Aba sem dependências instáveis
+  // Controle de rolagem e navegação entre abas no Modo de Exibição
   useEffect(() => {
-		if (!displayMode) {
-			return undefined;
-		}
+    if (!displayMode) {
+      return undefined;
+    }
 
-		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
-		setActiveTab(displayTabs[displayModeTabIndex]);
+    const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
+    setActiveTab(displayTabs[displayModeTabIndex]);
 
-		window.scrollTo(0, 0);
+    window.scrollTo(0, 0);
 
-		let frameId;
-		let startTimer;
-		let nextTabTimer;
-		let cancelled = false;
-		let lastFrameTime = null;
-		let tabSwitched = false;
-		let scrollAccumulator = 0;
+    let frameId;
+    let startTimer;
+    let nextTabTimer;
+    let cancelled = false;
+    let lastFrameTime = null;
+    let tabSwitched = false;
+    let scrollAccumulator = 0;
 
-		const scrollSlowly = (frameTime) => {
-			if (cancelled) {
-				return;
-			}
+    const scrollSlowly = (frameTime) => {
+      if (cancelled) {
+        return;
+      }
 
-			const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const maximumScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
 
-			if (maximumScroll <= 10 || window.scrollY >= maximumScroll - 5) {
-				if (!tabSwitched) {
-					tabSwitched = true;
-					const currentTab = displayTabs[displayModeTabIndex];
-					const delay = currentTab === 'dashboard' ? 20000 : 10000;
+      if (maximumScroll <= 10 || window.scrollY >= maximumScroll - 5) {
+        if (!tabSwitched) {
+          tabSwitched = true;
+          const currentTab = displayTabs[displayModeTabIndex];
+          const delay = currentTab === 'dashboard' ? 20000 : 10000;
 
-					nextTabTimer = window.setTimeout(() => {
-						if (!cancelled) {
-							setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
-						}
-					}, delay);
-				}
-				frameId = window.requestAnimationFrame(scrollSlowly);
-				return;
-			}
+          nextTabTimer = window.setTimeout(() => {
+            if (!cancelled) {
+              setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
+            }
+          }, delay);
+        }
+        frameId = window.requestAnimationFrame(scrollSlowly);
+        return;
+      }
 
-			if (lastFrameTime !== null) {
-				const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
-				scrollAccumulator += 40 * elapsedSeconds;
+      if (lastFrameTime !== null) {
+        const elapsedSeconds = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
+        scrollAccumulator += 40 * elapsedSeconds;
 
-				if (scrollAccumulator > maximumScroll) {
-					scrollAccumulator = maximumScroll;
-				}
+        if (scrollAccumulator > maximumScroll) {
+          scrollAccumulator = maximumScroll;
+        }
 
-				window.scrollTo(0, scrollAccumulator);
-			} else {
-				scrollAccumulator = window.scrollY;
-			}
+        window.scrollTo(0, scrollAccumulator);
+      } else {
+        scrollAccumulator = window.scrollY;
+      }
 
-			lastFrameTime = frameTime;
-			frameId = window.requestAnimationFrame(scrollSlowly);
-		};
+      lastFrameTime = frameTime;
+      frameId = window.requestAnimationFrame(scrollSlowly);
+    };
 
-		startTimer = window.setTimeout(() => {
-			window.scrollTo(0, 0);
-			scrollAccumulator = 0;
-			frameId = window.requestAnimationFrame(scrollSlowly);
-		}, 600);
+    startTimer = window.setTimeout(() => {
+      window.scrollTo(0, 0);
+      scrollAccumulator = 0;
+      frameId = window.requestAnimationFrame(scrollSlowly);
+    }, 600);
 
-		return () => {
-			cancelled = true;
-			window.clearTimeout(startTimer);
-			window.clearTimeout(nextTabTimer);
-			window.cancelAnimationFrame(frameId);
-		};
-	}, [displayMode, displayModeTabIndex]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+      window.clearTimeout(nextTabTimer);
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [displayMode, displayModeTabIndex]);
 
   useEffect(() => {
     if (!displayMode) {
@@ -2380,7 +2380,6 @@ export default function App() {
                 <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
               </div>
 
-              {/* GRÁFICO DE RECORRÊNCIA NA TELA PRINCIPAL */}
               <div className="list-panel">
                 <div className="section-title">
                   <div>
@@ -3295,7 +3294,7 @@ export default function App() {
             </div>
             <div className="toolbar">
               <div className="search-box">
-              <Search size={17} />
+                <Search size={17} />
                 <input placeholder="Buscar" value={commandSearch} onChange={(event) => setCommandSearch(event.target.value)} />
               </div>
               <span className="counter">{commandsTotal} registros</span>
