@@ -1013,22 +1013,23 @@ export default function App() {
   return activeTab;
   };
   
-  // Monitora quando a tela exibida muda para a dashboard e reseta o período para '1m'
+  // 1. Sempre que a tela mudar para o Dashboard, reseta para '1m'
   useEffect(() => {
-  // Verifica se a tela atual é o Dashboard
-  if (getActiveScreenId() === 'dashboard') {
-    // 1. Garante que começa em '1m' sempre que chega no Dashboard
-    setRecurrencePeriod('1m');
-
-    // 2. Agenda a troca para '6m' após 10 segundos
-    const timer = setTimeout(() => {
-      setRecurrencePeriod('6m');
-    }, 10000);
-
-    // Limpa o temporizador se o usuário sair da tela antes dos 10s
-    return () => clearTimeout(timer);
-  	}
+    if (getActiveScreenId() === 'dashboard') {
+      setRecurrencePeriod('1m');
+    }
   }, [displayModeTabIndex, displayMode, activeTab]);
+
+  // 2. Quando o periodo for '1m' e estivermos no Dashboard, conta 10s e muda para '6m'
+  useEffect(() => {
+    if (getActiveScreenId() === 'dashboard' && recurrencePeriod === '1m') {
+      const timer = setTimeout(() => {
+        setRecurrencePeriod('6m');
+      }, 10000);
+  
+      return () => clearTimeout(timer);
+    }
+  }, [displayModeTabIndex, displayMode, activeTab, recurrencePeriod]);
   
 
   const recurrenceChartData = useMemo(() => {
