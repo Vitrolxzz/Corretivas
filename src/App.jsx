@@ -1004,7 +1004,7 @@ export default function App() {
   const [clientHistory, setClientHistory] = useState(null);
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
   const [displayCycleCount, setDisplayCycleCount] = useState(0);
-	const recurrenceTimerRef = useRef(null);
+  const recurrenceTimerRef = useRef(null);
 	
   const getActiveScreenId = () => {
   if (displayMode) {
@@ -1014,36 +1014,35 @@ export default function App() {
   return activeTab;
   };
   
-  // 1. Reseta o período para '1m' sempre que a tela ativa MUDAR para o dashboard
-  useEffect(() => {
-    const currentScreen = getActiveScreenId();
-    if (currentScreen === 'dashboard') {
-      setRecurrencePeriod('1m');
-    }
-  }, [displayModeTabIndex, activeTab]); 
-  // Nota: Removemos 'displayMode' e funções das dependências para evitar re-execuções indesejadas.
-  
-  // 2. Controla o temporizador de 10 segundos quando o período for '1m'
-  useEffect(() => {
-    // Limpa qualquer temporizador pendente
-    if (recurrenceTimerRef.current) {
-      clearTimeout(recurrenceTimerRef.current);
-    }
-  
-    // Se estivermos em '1m', agenda a transição para '6m'
-    if (recurrencePeriod === '1m') {
-      recurrenceTimerRef.current = setTimeout(() => {
-        setRecurrencePeriod('6m');
-      }, 10000);
-    }
-  
-    // Cleanup ao desmontar ou trocar de estado
-    return () => {
-      if (recurrenceTimerRef.current) {
-        clearTimeout(recurrenceTimerRef.current);
-      }
-    };
-  }, [recurrencePeriod]); // Executa unicamente quando recurrencePeriod muda
+  // Referência para controlar o timer sem sofrer com re-renderizações
+const recurrenceTimeoutRef = useRef(null);
+
+// Controla a alternância de 1m -> 6m usando useRef
+useEffect(() => {
+  const isDashboard = getActiveScreenId() === 'dashboard';
+
+  if (!isDashboard) {
+    // Se saiu do dashboard, limpa o timer e volta para 1m para a próxima vez
+    if (recurrenceTimeoutRef.current) clearTimeout(recurrenceTimeoutRef.current);
+    setRecurrencePeriod('1m');
+    return;
+  }
+
+  // Se acabou de entrar no Dashboard e está em '1m', agenda a mudança para '6m'
+  if (isDashboard && recurrencePeriod === '1m') {
+    // Garante que não há outro timer rodando em paralelo
+    if (recurrenceTimeoutRef.current) clearTimeout(recurrenceTimeoutRef.current);
+
+    recurrenceTimeoutRef.current = setTimeout(() => {
+      setRecurrencePeriod('6m');
+    }, 10000); // 10 segundos
+  }
+
+  return () => {
+    // IMPORTANTE: Não limpamos o timer no cleanup comum se continuarmos no dashboard,
+    // apenas quando o componente realmente desmontar.
+  };
+}, [displayModeTabIndex, activeTab, recurrencePeriod]);
   
 
   const recurrenceChartData = useMemo(() => {
