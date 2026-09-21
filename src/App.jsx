@@ -1021,6 +1021,25 @@ export default function App() {
   }
   return activeTab;
   };
+  
+  // Monitora quando a tela exibida muda para a dashboard e reseta o período para '1m'
+  useEffect(() => {
+    if (getActiveScreenId() === 'dashboard') {
+      setRecurrencePeriod('1m');
+    }
+  }, [displayModeTabIndex, displayMode, activeTab]);
+  
+  useEffect(() => {
+  // Só ativa o temporizador se o gráfico estiver em '1m'
+  if (recurrencePeriod !== '1m') return;
+
+  const timer = setTimeout(() => {
+    setRecurrencePeriod('6m');
+  }, 7500);
+
+  return () => clearTimeout(timer);
+  }, [recurrencePeriod]);
+  
 
   const recurrenceChartData = useMemo(() => {
     const now = new Date();
