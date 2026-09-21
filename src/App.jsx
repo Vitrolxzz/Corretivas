@@ -1021,28 +1021,20 @@ const recurrenceTimeoutRef = useRef(null);
 useEffect(() => {
   const isDashboard = getActiveScreenId() === 'dashboard';
 
+  // Se não estiver no Dashboard, força o gráfico para '1m' e não cria o intervalo
   if (!isDashboard) {
-    // Se saiu do dashboard, limpa o timer e volta para 1m para a próxima vez
-    if (recurrenceTimeoutRef.current) clearTimeout(recurrenceTimeoutRef.current);
     setRecurrencePeriod('1m');
     return;
   }
 
-  // Se acabou de entrar no Dashboard e está em '1m', agenda a mudança para '6m'
-  if (isDashboard && recurrencePeriod === '1m') {
-    // Garante que não há outro timer rodando em paralelo
-    if (recurrenceTimeoutRef.current) clearTimeout(recurrenceTimeoutRef.current);
+  // Cria o intervalo para alternar o período a cada 10 segundos
+  const interval = setInterval(() => {
+    setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
+  }, 10000);
 
-    recurrenceTimeoutRef.current = setTimeout(() => {
-      setRecurrencePeriod('6m');
-    }, 10000); // 10 segundos
-  }
-
-  return () => {
-    // IMPORTANTE: Não limpamos o timer no cleanup comum se continuarmos no dashboard,
-    // apenas quando o componente realmente desmontar.
-  };
-}, [displayModeTabIndex, activeTab, recurrencePeriod]);
+  // Limpa o intervalo quando mudar de aba ou desmontar
+  return () => clearInterval(interval);
+}, [displayModeTabIndex, activeTab]);
   
 
   const recurrenceChartData = useMemo(() => {
