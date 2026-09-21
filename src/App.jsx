@@ -1004,6 +1004,7 @@ export default function App() {
   const [clientHistory, setClientHistory] = useState(null);
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
   const [displayCycleCount, setDisplayCycleCount] = useState(0);
+	const recurrenceTimerRef = useRef(null);
 	
   const getActiveScreenId = () => {
   if (displayMode) {
@@ -1013,23 +1014,36 @@ export default function App() {
   return activeTab;
   };
   
-  // 1. Sempre que a tela mudar para o Dashboard, reseta para '1m'
+  // 1. Reseta o período para '1m' sempre que a tela ativa MUDAR para o dashboard
   useEffect(() => {
-    if (getActiveScreenId() === 'dashboard') {
+    const currentScreen = getActiveScreenId();
+    if (currentScreen === 'dashboard') {
       setRecurrencePeriod('1m');
     }
-  }, [displayModeTabIndex, displayMode, activeTab]);
-
-  // 2. Quando o periodo for '1m' e estivermos no Dashboard, conta 10s e muda para '6m'
+  }, [displayModeTabIndex, activeTab]); 
+  // Nota: Removemos 'displayMode' e funções das dependências para evitar re-execuções indesejadas.
+  
+  // 2. Controla o temporizador de 10 segundos quando o período for '1m'
   useEffect(() => {
-    if (getActiveScreenId() === 'dashboard' && recurrencePeriod === '1m') {
-      const timer = setTimeout(() => {
+    // Limpa qualquer temporizador pendente
+    if (recurrenceTimerRef.current) {
+      clearTimeout(recurrenceTimerRef.current);
+    }
+  
+    // Se estivermos em '1m', agenda a transição para '6m'
+    if (recurrencePeriod === '1m') {
+      recurrenceTimerRef.current = setTimeout(() => {
         setRecurrencePeriod('6m');
       }, 10000);
-  
-      return () => clearTimeout(timer);
     }
-  }, [displayModeTabIndex, displayMode, activeTab, recurrencePeriod]);
+  
+    // Cleanup ao desmontar ou trocar de estado
+    return () => {
+      if (recurrenceTimerRef.current) {
+        clearTimeout(recurrenceTimerRef.current);
+      }
+    };
+  }, [recurrencePeriod]); // Executa unicamente quando recurrencePeriod muda
   
 
   const recurrenceChartData = useMemo(() => {
