@@ -1019,13 +1019,12 @@ export default function App() {
 		const now = new Date();
 		const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
 
-		// Define a data limite inicial (ex: 6 meses atrás)
+		// Data limite inicial
 		const cutoffDate = new Date();
 		cutoffDate.setMonth(now.getMonth() - monthsCutoff);
 		cutoffDate.setHours(0, 0, 0, 0);
 
-		// Se for 6 meses, considera até o último dia do mês passado (ex: 31/08)
-		// Se for 1 mês, considera até o momento atual
+		// Limite final: se for 6m, vai até o último dia do mês anterior; se 1m, vai até agora
 		const endDate = recurrencePeriod === '6m'
 			? new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
 			: now;
@@ -1052,27 +1051,43 @@ export default function App() {
 		const top9 = sortedClients.slice(0, 9);
 		const remaining = sortedClients.slice(9);
 
-		// Calcula a porcentagem para o Top 9
-		let top9PercentSum = 0;
-		const result = top9.map(([label, value]) => {
-			const percent = Math.round((value / total) * 100);
-			top9PercentSum += percent;
-			return { label, value, percent };
-		});
+		// Lista inicial de fatias (Top 9 + Outros se houver)
+		const slices = top9.map(([label, value]) => ({ label, value }));
 
-		// Para "Outros", atribui a diferença restante para garantir total exato de 100%
 		const othersCount = remaining.reduce((sum, [, value]) => sum + value, 0);
-
 		if (othersCount > 0) {
-			const othersPercent = Math.max(0, 100 - top9PercentSum);
-			result.push({
-				label: 'Outros',
-				value: othersCount,
-				percent: othersPercent,
-			});
+			slices.push({ label: 'Outros', value: othersCount });
 		}
 
-		return result;
+		// --- APLICAÇÃO DO ALGORITMO DO MAIOR RESTO (SOMA EXACTA DE 100%) ---
+		const itemsWithExact = slices.map((item) => {
+			const exactPercent = (item.value / total) * 100;
+			const floorPercent = Math.floor(exactPercent);
+			const decimalPart = exactPercent - floorPercent;
+			return {
+				...item,
+				percent: floorPercent,
+				decimalPart,
+			};
+		});
+
+		// Calcula quantos pontos faltam para chegar a 100%
+		const currentSum = itemsWithExact.reduce((sum, item) => sum + item.percent, 0);
+		let remainder = 100 - currentSum;
+
+		// Ordena os itens pela maior parte decimal para distribuir os pontos restantes
+		const sortedByDecimal = [...itemsWithExact].sort((a, b) => b.decimalPart - a.decimalPart);
+
+		for (let i = 0; i < remainder; i++) {
+			sortedByDecimal[i].percent += 1;
+		}
+
+		// Retorna a lista mantendo a ordem original dos valores
+		return itemsWithExact.map(({ label, value, percent }) => ({
+			label,
+			value,
+			percent,
+		}));
 	}, [appointments, recurrencePeriod]);
 
   const selectedPeriod = useMemo(
