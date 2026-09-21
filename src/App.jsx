@@ -49,7 +49,7 @@ const tabs = [
 ];
 
 const healthOptions = ['Ok', 'Nulo'];
-const situations = ['com problema', 'em observaÃ§Ã£o', 'em testes', 'ok'];
+const situations = ['com problema', 'em observação', 'em testes', 'ok'];
 const difficultyOptions = [
   { value: '1', label: '1 - muito facil' },
   { value: '2', label: '2 - facil' },
@@ -534,17 +534,14 @@ function DonutChart({ rows = [] }) {
   );
 }
 
-function DisplayModeView({ activeView, dashboard, appointments, turnstiles, selectedPeriod, onExit }) {
-	// 1. Estado interno para controlar a seleção de 1 mês ou 6 meses
-	const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
-
+function DisplayModeView({ activeView, dashboard, appointments, turnstiles, selectedPeriod, onExit, recurrencePeriod, onToggleRecurrence }) {
 	const viewTitle = {
 		dashboard: 'Dashboard',
 		appointments: 'Agendamentos',
 		turnstiles: 'Catracas para montagem',
 	}[activeView];
 
-	// 2. Cálculo do gráfico de Recorrência usando a lista de agendamentos do Modo de Exibição
+	// Cálculo do gráfico de Recorrência usando a lista de agendamentos do Modo de Exibição
 	const recurrenceChartData = useMemo(() => {
 		const now = new Date();
 		const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
@@ -552,7 +549,6 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 		const cutoffDate = new Date();
 		cutoffDate.setMonth(now.getMonth() - monthsCutoff);
 
-		// Filtra agendamentos pelo período
 		const filtered = (appointments || []).filter((item) => {
 			const rawDate = item.visitDate || item.visit_date;
 			if (!rawDate) return false;
@@ -561,7 +557,6 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 			return itemDate >= cutoffDate && itemDate <= now;
 		});
 
-		// Contagem de atendimentos por cliente
 		const counts = {};
 		filtered.forEach((item) => {
 			const name = item.clientName || item.client_name || item.client || 'Não identificado';
@@ -571,7 +566,6 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 		const total = filtered.length;
 		if (!total) return [];
 
-		// Formata o array para renderizar as barras (Top 10 clientes)
 		return Object.entries(counts)
 			.map(([label, value]) => ({
 				label,
@@ -582,7 +576,6 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 			.slice(0, 10);
 	}, [appointments, recurrencePeriod]);
 
-	// Filtra apenas os agendamentos do dia anterior útil, dia atual e próximo dia útil
 	const filteredAppointments = useMemo(() => {
 		return getDisplayModeAppointments(appointments);
 	}, [appointments]);
@@ -645,14 +638,14 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 										<button
 											className={recurrencePeriod === '1m' ? 'active' : ''}
 											type="button"
-											onClick={() => setRecurrencePeriod('1m')}
+											onClick={() => onToggleRecurrence && onToggleRecurrence('1m')}
 										>
 											1m
 										</button>
 										<button
 											className={recurrencePeriod === '6m' ? 'active' : ''}
 											type="button"
-											onClick={() => setRecurrencePeriod('6m')}
+											onClick={() => onToggleRecurrence && onToggleRecurrence('6m')}
 										>
 											6m
 										</button>
@@ -1003,39 +996,24 @@ export default function App() {
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [clientHistory, setClientHistory] = useState(null);
   const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
-  const [displayCycleCount, setDisplayCycleCount] = useState(0);
-  const recurrenceTimerRef = useRef(null);
-	
-  const getActiveScreenId = () => {
-  if (displayMode) {
-    const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
-    return displayTabs[displayModeTabIndex];
-  }
-  return activeTab;
-  };
-  
-  // Referência para controlar o timer sem sofrer com re-renderizações
-const recurrenceTimeoutRef = useRef(null);
 
-// Controla a alternância de 1m -> 6m usando useRef
-useEffect(() => {
-  const isDashboard = getActiveScreenId() === 'dashboard';
+  // Alternância do temporizador de recorrência totalmente desacoplada da renderização
+  useEffect(() => {
+    const isDashboard = displayMode 
+      ? ['dashboard', 'appointments', 'turnstiles'][displayModeTabIndex] === 'dashboard'
+      : activeTab === 'dashboard';
 
-  // Se não estiver no Dashboard, força o gráfico para '1m' e não cria o intervalo
-  if (!isDashboard) {
-    setRecurrencePeriod('1m');
-    return;
-  }
+    if (!isDashboard) {
+      setRecurrencePeriod('1m');
+      return undefined;
+    }
 
-  // Cria o intervalo para alternar o período a cada 10 segundos
-  const interval = setInterval(() => {
-    setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
-  }, 10000);
+    const interval = setInterval(() => {
+      setRecurrencePeriod((prev) => (prev === '1m' ? '6m' : '1m'));
+    }, 10000);
 
-  // Limpa o intervalo quando mudar de aba ou desmontar
-  return () => clearInterval(interval);
-}, [displayModeTabIndex, activeTab]);
-  
+    return () => clearInterval(interval);
+  }, [displayMode, displayModeTabIndex, activeTab]);
 
   const recurrenceChartData = useMemo(() => {
     const now = new Date();
@@ -1465,6 +1443,7 @@ useEffect(() => {
     setDailyReportPage(1);
   }, [dailyStartDate, dailyEndDate]);
 
+  // Controle do Scroll e Troca de Aba sem dependências instáveis
   useEffect(() => {
 		if (!displayMode) {
 			return undefined;
@@ -1473,7 +1452,6 @@ useEffect(() => {
 		const displayTabs = ['dashboard', 'appointments', 'turnstiles'];
 		setActiveTab(displayTabs[displayModeTabIndex]);
 
-		// Zera a posição da página ao trocar de aba
 		window.scrollTo(0, 0);
 
 		let frameId;
@@ -1499,14 +1477,7 @@ useEffect(() => {
 
 					nextTabTimer = window.setTimeout(() => {
 						if (!cancelled) {
-							setDisplayModeTabIndex((current) => {
-								const nextIndex = (current + 1) % displayTabs.length;
-								// Se o próximo índice for 0 (Dashboard), incrementa o ciclo para forçar o reset do gráfico
-								if (nextIndex === 0) {
-									setDisplayCycleCount((c) => c + 1);
-								}
-								return nextIndex;
-							});
+							setDisplayModeTabIndex((current) => (current + 1) % displayTabs.length);
 						}
 					}, delay);
 				}
@@ -1545,19 +1516,6 @@ useEffect(() => {
 		};
 	}, [displayMode, displayModeTabIndex]);
 
-  // Reseta o gráfico para '1m' sempre que a aba ativa ou o modo de exibição mudar para a Dashboard
-	useEffect(() => {
-		if (activeTab === 'dashboard') {
-			setRecurrencePeriod('1m');
-
-			const timer = window.setTimeout(() => {
-				setRecurrencePeriod('6m');
-			}, 7500);
-
-			return () => window.clearTimeout(timer);
-		}
-	}, [activeTab, displayModeTabIndex]);
-	
   useEffect(() => {
     if (!displayMode) {
       return undefined;
@@ -2279,6 +2237,7 @@ useEffect(() => {
         selectedPeriod={selectedPeriod}
         onExit={exitDisplayMode}
         recurrencePeriod={recurrencePeriod}
+        onToggleRecurrence={(period) => setRecurrencePeriod(period)}
       />
     );
   }
@@ -2421,7 +2380,7 @@ useEffect(() => {
                 <DonutChart rows={dashboard?.charts?.visitTypeShare || []} />
               </div>
 
-              {/* NOVO GRÁFICO DE RECORRÊNCIA */}
+              {/* GRÁFICO DE RECORRÊNCIA NA TELA PRINCIPAL */}
               <div className="list-panel">
                 <div className="section-title">
                   <div>
