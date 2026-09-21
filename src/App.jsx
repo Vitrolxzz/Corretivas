@@ -1016,38 +1016,52 @@ export default function App() {
   }, [displayMode, displayModeTabIndex, activeTab]);
 
   const recurrenceChartData = useMemo(() => {
-    const now = new Date();
-    const monthsCutoff = recurrencePeriod === '1m' ? 1 : 6;
+	// 1. Filtra os agendamentos de acordo com o período selecionado (1m ou 6m)
+	const now = new Date();
+	const monthsLimit = recurrencePeriod === '1m' ? 1 : 6;
+	const thresholdDate = new Date(now.getFullYear(), now.getMonth() - monthsLimit, now.getDate());
 
-    const cutoffDate = new Date();
-    cutoffDate.setMonth(now.getMonth() - monthsCutoff);
+	const filteredAppointments = appointments.filter((item) => {
+		if (!item.visitDate) return false;
+		const itemDate = new Date(item.visitDate);
+		return itemDate >= thresholdDate;
+	});
 
-    const filtered = (appointments || []).filter((item) => {
-      const rawDate = item.visitDate || item.visit_date;
-      if (!rawDate) return false;
+	const totalAppointments = filteredAppointments.length;
+	if (!totalAppointments) return [];
 
-      const itemDate = new Date(rawDate);
-      return itemDate >= cutoffDate && itemDate <= now;
-    });
+	// 2. Conta quantas ocorrências cada cliente tem no período
+	const countsByClient = filteredAppointments.reduce((acc, curr) => {
+		const client = curr.clientName || 'Não identificado';
+		acc[client] = (acc[client] || 0) + 1;
+		return acc;
+	}, {});
 
-    const counts = {};
-    filtered.forEach((item) => {
-      const name = item.clientName || item.client_name || item.client || 'Não identificado';
-      counts[name] = (counts[name] || 0) + 1;
-    });
+	// 3. Ordena os clientes do maior para o menor número de atendimentos
+	const sortedClients = Object.entries(countsByClient).sort((a, b) => b[1] - a[1]);
 
-    const total = filtered.length;
-    if (!total) return [];
+	// 4. Separa os Top 9 e agrupa os demais
+	const top9 = sortedClients.slice(0, 9);
+	const remaining = sortedClients.slice(9);
 
-    return Object.entries(counts)
-      .map(([label, value]) => ({
-        label,
-        value,
-        percent: Math.round((value / total) * 100),
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
-  }, [appointments, recurrencePeriod]);
+	const top9Rows = top9.map(([label, value]) => ({
+		label,
+		value,
+		percent: Math.round((value / totalAppointments) * 100),
+	}));
+
+	const othersCount = remaining.reduce((sum, [, value]) => sum + value, 0);
+
+	if (othersCount > 0) {
+		top9Rows.push({
+			label: 'Outros',
+			value: othersCount,
+			percent: Math.round((othersCount / totalAppointments) * 100),
+		});
+	}
+
+	return top9Rows;
+}, [appointments, recurrencePeriod]);
 
   const selectedPeriod = useMemo(
     () => periods.find((period) => String(period.id) === String(selectedPeriodId)) || null,
