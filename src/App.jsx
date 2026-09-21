@@ -538,15 +538,6 @@ function DisplayModeView({ activeView, dashboard, appointments, turnstiles, sele
 	// 1. Estado interno para controlar a seleção de 1 mês ou 6 meses
 	const [recurrencePeriod, setRecurrencePeriod] = useState('1m');
 
-	// alterna o gráfico para '6m'
-	useEffect(() => {
-	const interval = setInterval(() => {
-		setRecurrencePeriod('6m');
-	}, 10000);
-
-	return () => clearInterval(interval);
-}, []);
-
 	const viewTitle = {
 		dashboard: 'Dashboard',
 		appointments: 'Agendamentos',
