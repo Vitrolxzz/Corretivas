@@ -112,7 +112,7 @@ const emptyAppointment = {
   reportedProblem: '',
   notes: '',
   annotations: '',
-  visitType: '',
+  visitType: appointmentVisitTypes[0],
   visitDate: '',
   technician: '',
   visitValue: '',
@@ -2623,7 +2623,6 @@ export default function App() {
               <div className="form-grid two-fields">
                 <Field label="Tipo visita">
                   <select value={appointmentForm.visitType} onChange={(event) => updateAppointment('visitType', event.target.value)}>
-                    <option value="">Selecione</option>
                     {appointmentVisitTypes.map((type) => (
                       <option key={type} value={type}>
                         {type}
