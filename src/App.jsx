@@ -3967,7 +3967,7 @@ export default function App() {
         ))}
       </datalist>
 
-      <footer className="footer-strip">
+      <footer className="footer-strip" style={{ display: "none" }}>
         <span>
           <ShieldCheck size={15} /> Backup
         </span>
